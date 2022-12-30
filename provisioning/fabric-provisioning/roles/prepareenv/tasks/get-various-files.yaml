@@ -1,0 +1,44 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Get OS architecture
+  shell: >-
+    echo "$(uname -s|tr '[:upper:]' '[:lower:]'|sed
+    's/mingw64_nt.*/windows/')-$(uname -m | sed 's/x86_64/amd64/g')"
+  register: os_architecture
+  tags:
+  - bm-set
+- name: Clone Fabric-Samples
+  git:
+    repo: "https://github.com/hyperledger/fabric-samples.git"
+    dest: "{{ LOCAL_SAMPLE_PATH }}"
+  throttle: 5
+  tags:
+  - bm-set
+- name: Download Hyperledger binaries
+  get_url:
+    url: >-
+      https://github.com/hyperledger/fabric/releases/download/v{{ FABRIC }}/hyperledger-fabric-{{os_architecture.stdout }}-{{ FABRIC }}.tar.gz
+#      https://nexus.hyperledger.org/content/repositories/releases/org/hyperledger/fabric/hyperledger-fabric/{{
+#      os_architecture.stdout }}-{{ FABRIC
+#      }}/hyperledger-fabric-{{os_architecture.stdout }}-{{ FABRIC }}.tar.gz
+    dest: "{{ LOCAL_BINARY_PATH }}.tar.gz"
+  tags:
+  - bm-set
+- name: Creates Hyperledger binary directory
+  file: "path={{ LOCAL_BINARY_PATH }} state=directory"
+  tags:
+  - bm-set
+- name: Extract Hyperledger binaries
+  unarchive:
+    src: "{{ LOCAL_BINARY_PATH }}.tar.gz"
+    dest: "{{ LOCAL_BINARY_PATH }}"
+  tags:
+  - bm-set
+- name: Information regarding download paths
+  debug:
+    msg: >-
+      Sample path location: {{ LOCAL_SAMPLE_PATH }} Binary path location: {{
+      LOCAL_BINARY_PATH }} The files have been downloaded successfully.
+  tags:
+  - bm-set

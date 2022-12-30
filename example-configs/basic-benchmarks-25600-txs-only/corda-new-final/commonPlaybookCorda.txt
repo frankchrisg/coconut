@@ -1,0 +1,39 @@
+BASE_PATH: "/home/parallels/FINAL_graphene_corda_latest_xxx"
+CHOWN_PATH: "/home/parallels/FINAL_graphene_corda_latest_xxx/"
+CORDAPP_WORKFLOWS_BASE_PATH: "/home/parallels/FINAL_graphene_corda_latest_xxx/corda-provisioning/templates/flows"
+CORDAPP_CONTRACTS_BASE_PATH: "/home/parallels/FINAL_graphene_corda_latest_xxx/corda-provisioning/templates/flows"
+CORDAPP_SUB_PATH: "flows"
+CORDA_NETWORK_BOOTSTRAPPER_URL: "https://software.r3.com/artifactory/corda/net/corda/corda-tools-network-bootstrapper/4.8.6/corda-tools-network-bootstrapper-4.8.6.jar"
+#"http://192.168.178.22:8989/corda-tools-network-bootstrapper-4.8.6.jar"
+#"https://software.r3.com/artifactory/corda/net/corda/corda-tools-network-bootstrapper/4.8.6/corda-tools-network-bootstrapper-4.8.6.jar"
+#"http://192.168.178.22:8989/corda-tools-network-bootstrapper-4.8.6.jar" 
+#"https://software.r3.com/artifactory/corda/net/corda/corda-tools-network-bootstrapper/4.8.6/corda-tools-network-bootstrapper-4.8.6.jar"
+CORDA_URL: "https://software.r3.com/artifactory/corda/net/corda/corda/4.8.6/corda-4.8.6.jar"
+#"http://192.168.178.22:8989/corda-4.8.6.jar"
+#"https://software.r3.com/artifactory/corda/net/corda/corda/4.8.6/corda-4.8.6.jar"
+#"http://192.168.178.22:8989/corda-4.8.6.jar"
+#"https://software.r3.com/artifactory/corda/net/corda/corda/4.8.6/corda-4.8.6.jar"
+BOOTSTRAP_MAX_MESSAGE_SIZE: 10485760
+BOOTSTRAP_MAX_TRANSACTION_SIZE: 524288000
+DEV_MODE: true
+RETRIES_DOCKER: 100
+DELAY_DOCKER: 1
+RESTART_NODES: true
+SLEEP_TIME: "{{ 30 | random(start=10, step=10) }}"
+CUSTOM_ARGS: 'jvmArgs: [ "-Xmx12G" ]'
+# ''
+# 'jvmArgs: [ "-Xmx4G" ]'
+# 'jvmArgs: [ "-Xmx1G", "-XX:+UseG1GC" ]'
+USER_NAME: user
+USER_PASSWORD: password123
+# Default: 30
+FLOW_TIMEOUT: 30
+# Default: 6
+MAX_RESTART_COUNT: 6
+INFLUXDB_ADMIN_USER: "admin"
+INFLUXDB_ADMIN_PASSWORD: "password123"
+INFLUXDB_USER: "lrdata"
+INFLUXDB_USER_PASSWORD: "password123"
+BRIDGED_MODE: true
+SWARM_PREFIX: "192.168.2."
+TRANSACTION_CACHE_SIZE_MB: 8

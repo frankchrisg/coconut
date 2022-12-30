@@ -1,0 +1,8 @@
+- import_playbook: init.yaml serial=100 hostset=realservers
+  when: INIT is defined and INIT | bool
+- import_playbook: common.yaml serial=100 hostset=realservers
+  when: COMMON is defined and COMMON | bool
+- import_playbook: hosts.yaml serial=100 hostset=realservers
+- import_playbook: statistics-influxdb.yaml serial=100 hostset=statistics
+- import_playbook: prepare-environment.yaml serial=100 hostset=client
+- import_playbook: client.yaml serial=1000 hostset=client

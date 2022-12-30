@@ -1,0 +1,34 @@
+version: "2"
+
+volumes:
+  blockchain-explorer.com:
+
+#networks:
+#  {{ NET_NAME }}:
+
+services:
+  blockchain-explorer.com:
+    container_name: blockchain-explorer.com
+    image: blockchain-explorer
+    network_mode: "host"
+    restart: "no"
+    environment:
+      - DATABASE_HOST={% if hostvars[item]['databaseip'] is defined -%}{{ hostvars[item]['databaseip'] }}
+      - DISCOVERY_AS_LOCALHOST=false
+{% endif %}
+      - DATABASE_PORT={{ DATABASE_PORT }}
+      - DATABASE_DATABASE=fabricexplorer
+      - DATABASE_USERNAME={{ DATABASE_USER }}
+      - DATABASE_PASSWD={{ DATABASE_PASSWORD }}
+    #    ports:
+    #      - "60000:8080"
+    #    networks:
+    #      - {{ NET_NAME }}
+    volumes:
+      - "{{ MAIN_CONFIG_PATH }}/blockchain-explorer_configs/blockchain-explorer-config-main.json:/opt/explorer/app/platform/fabric/config.json"
+      - "{{ MAIN_CONFIG_PATH }}/blockchain-explorer_configs/blockchain-explorer-config.json:/opt/explorer/app/platform/fabric/network-1.json"
+      - "{{ MAIN_CONFIG_PATH }}/blockchain-explorer_configs/appconfig.json:/opt/explorer/appconfig.json"
+      - "{{ LOCAL_CRYPTO_PATH }}/crypto-config:{{ LOCAL_CRYPTO_PATH }}/crypto-config"
+      - /etc/timezone:/etc/timezone
+      - /etc/security/limits.conf:/etc/security/limits.conf
+      - /etc/sysctl.conf:/etc/sysctl.conf

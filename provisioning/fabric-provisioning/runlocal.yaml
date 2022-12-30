@@ -1,0 +1,44 @@
+- import_playbook: init.yaml SERIAL_EXECUTION_PB=100 hostset=realservers
+  when: INIT is defined and INIT | bool
+- import_playbook: common.yaml SERIAL_EXECUTION_PB=100 hostset=realservers
+  when: COMMON is defined and COMMON | bool
+- import_playbook: prepareenv.yaml SERIAL_EXECUTION_PB=100 hostset=local
+- import_playbook: copyenv.yaml SERIAL_EXECUTION_PB=100 hostset=realservers tags=largetask
+- import_playbook: zookeeper.yaml SERIAL_EXECUTION_PB=100 hostset=zookeeper
+- import_playbook: kafka.yaml SERIAL_EXECUTION_PB=100 hostset=kafka
+- import_playbook: couchdb.yaml SERIAL_EXECUTION_PB=100 hostset=couchdb
+- import_playbook: peer.yaml SERIAL_EXECUTION_PB=100 hostset=peer
+- import_playbook: peer-clean-after.yaml SERIAL_EXECUTION_PB=100
+- import_playbook: orderer.yaml SERIAL_EXECUTION_PB=100 hostset=orderer
+- import_playbook: build-chaincode-images.yaml SERIAL_EXECUTION_PB=100 hostset=peer
+- import_playbook: setup-telegraf.yaml SERIAL_EXECUTION_PB=100 hostset=orderer
+- import_playbook: ca.yaml SERIAL_EXECUTION_PB=100 hostset=ca
+- import_playbook: setup-telegraf.yaml SERIAL_EXECUTION_PB=100 hostset=couchdb
+  when: ENABLE_COUCHDB
+- import_playbook: setup-telegraf.yaml SERIAL_EXECUTION_PB=100 hostset=peer
+- import_playbook: setup-telegraf.yaml SERIAL_EXECUTION_PB=100 hostset=orderer
+- import_playbook: setup-telegraf.yaml SERIAL_EXECUTION_PB=100 hostset=ca
+- import_playbook: setup-telegraf.yaml SERIAL_EXECUTION_PB=100 hostset=kafka
+  when: KAFKA_RAFT_OR_SOLO == "kafka"
+- import_playbook: setup-telegraf.yaml SERIAL_EXECUTION_PB=100 hostset=zookeeper
+  when: KAFKA_RAFT_OR_SOLO == "kafka"
+- import_playbook: cli.yaml SERIAL_EXECUTION_PB=100 hostset=local
+- import_playbook: postprovision.yaml SERIAL_EXECUTION_PB=100 hostset=local
+#- import_playbook: blockchain-explorer.yaml SERIAL_EXECUTION_PB=100 hostset=blockchain-explorer
+- import_playbook: statsd.yaml SERIAL_EXECUTION_PB=100 hostset=statsd
+- import_playbook: statistics-influxdb.yaml SERIAL_EXECUTION_PB=100 hostset=statistics
+
+# Manual steps to execute every Playbook separately
+#ansible-playbook common.yaml -l realservers --extra-vars "hostset=realservers"
+#ansible-playbook prepareenv.yaml
+#ansible-playbook copyenv.yaml --extra-vars "hostset=realservers"
+#ansible-playbook zookeeper.yaml
+#ansible-playbook kafka.yaml
+#ansible-playbook couchdb.yaml
+#ansible-playbook peer.yaml
+#ansible-playbook build-chaincode-images.yaml
+#ansible-playbook orderer.yaml
+#ansible-playbook ca.yaml
+#ansible-playbook cli.yaml
+#ansible-playbook postprovision.yaml
+#ansible-playbook blockchain-explorer.yaml

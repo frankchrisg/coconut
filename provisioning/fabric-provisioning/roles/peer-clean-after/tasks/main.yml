@@ -1,0 +1,7 @@
+- name: Remove IP counter file
+  file:
+    path: /tmp/peerccip.txt
+    state: absent
+  throttle: 1
+  tags:
+  - bm-set

@@ -1,0 +1,72 @@
+- name: Get current user
+  command: whoami
+  register: current_user
+  tags:
+  - bm-set
+  - chown
+- name: Create directories for node configuration
+  file:
+    path: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}"
+    state: directory
+    owner: "{{ current_user.stdout }}"
+    group: "{{ current_user.stdout }}"
+  loop: "{{ groups['node'] }}"
+  loop_control:
+    index_var: my_idx
+    loop_var: item
+  tags:
+  - bm-set
+
+- name: Register hostname
+  command: hostname
+  register: hostname
+  tags:
+  - bm-set
+
+- name: Create telegraf.conf
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/telegraf-container.j2"
+    dest: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}_telegraf.conf"
+  loop: "{{ groups['node'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Create node configuration files
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/node-configuration.j2"
+    dest: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}_node.conf"
+  loop: "{{ groups['node'] }}"
+  loop_control:
+    index_var: my_idx
+    loop_var: item
+  tags:
+  - bm-set
+- name: Check if {{ CORDA_PATH }}/{{ CORDA_NETWORK_BOOTSTRAPPER_URL.split('/')[-1] }} exists
+  stat:
+    path: "{{ CORDA_PATH }}/{{ CORDA_NETWORK_BOOTSTRAPPER_URL.split('/')[-1] }}"
+  register: stat_result
+  tags:
+  - bm-set
+
+- name: Create corda path
+  file:
+    path: "{{ CORDA_PATH }}"
+    state: directory
+  tags:
+  - bm-set
+
+- name: Download corda network bootstrapper
+  get_url:
+    url: "{{ CORDA_NETWORK_BOOTSTRAPPER_URL }}"
+    dest: "{{ CORDA_PATH }}/"
+    force: "{{ CORDA_FORCE_CLONE }}"
+  when: not stat_result.stat.exists or CORDA_FORCE_CLONE
+#    validate_certs: "no"
+  tags:
+  - bm-set
+- name: Create node configuration
+  shell: $(which java) -jar {{ CORDA_PATH }}/{{ CORDA_NETWORK_BOOTSTRAPPER_URL.split('/')[-1] }} --verbose --logging-level={{ BOOTSTRAP_LOGGING_LEVEL }} --dir={{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }} --copy-cordapps={{ BOOTSTRAP_COPY_CORDAPPS }} --minimum-platform-version={{ BOOTSTRAPE_MINIMUM_PLATFORM_VERSION }} --max-message-size={{ BOOTSTRAP_MAX_MESSAGE_SIZE }} --max-transaction-size={{ BOOTSTRAP_MAX_TRANSACTION_SIZE }} --event-horizon={{ BOOTSTRAP_EVENT_HORIZON }}
+  tags:
+  - bm-set

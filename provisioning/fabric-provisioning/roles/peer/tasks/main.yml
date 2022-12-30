@@ -1,0 +1,7 @@
+- name: Pull peer image
+  docker_image:
+    name: "hyperledger/fabric-peer:{{ IMAGE_TAG }}"
+    tag: "fabric-peer"
+  tags:
+  - bm-set
+- import_tasks: provide-peer.yaml

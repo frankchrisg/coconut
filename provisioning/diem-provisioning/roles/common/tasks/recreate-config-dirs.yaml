@@ -1,0 +1,26 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Get current user
+  command: whoami
+  register: current_user
+  tags:
+  - chown
+  - bm-set
+- name: Delete directory for diem configuration files
+  file: "path={{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/ state=absent"
+  become: true
+  tags:
+  - bm-set
+- name: Create directory for diem configuration files
+  file: "path={{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/ state=directory owner={{ current_user.stdout }} group={{ current_user.stdout }}"
+  tags:
+  - bm-set
+- name: chown directories to current user
+  file:
+    dest: "{{ CHOWN_PATH }}/"
+    owner: "{{ current_user.stdout }}"
+    group: "{{ current_user.stdout }}"
+    recurse: "yes"
+  become: true
+  tags: "chown"

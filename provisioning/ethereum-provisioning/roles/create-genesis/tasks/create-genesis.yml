@@ -1,0 +1,23 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Register all keys
+  debug:
+    msg: "{{ item }}"
+  with_lines: "cat {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/enodes_local.json"
+  register: all_keys
+  tags:
+  - bm-set
+- name: Register all signer keys
+  debug:
+    msg: "{{ item }}"
+  with_lines: "cat {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/signer_keys.txt"
+  register: all_keys_signer
+  tags:
+  - bm-set
+- name: Create genesis file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/genesis.j2"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/genesis.json" 
+  tags:
+  - bm-set

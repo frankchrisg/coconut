@@ -1,0 +1,11 @@
+clientPort={{ 2200 + groups['zookeeper'].index(inventory_hostname) }}
+dataDir=/data
+dataLogDir=/datalog
+tickTime=2000
+initLimit=5
+syncLimit=2
+autopurge.snapRetainCount=3
+autopurge.purgeInterval=1
+quorumListenOnAllIPs=true
+{% for host in groups['zookeeper'] %}server.{{ 100 + loop.index0 }}={{ hostvars[host]['inventory_hostname'] }}:{{ 20000 + loop.index0 }}:{{ 21000 + loop.index0 }}
+{% endfor %}

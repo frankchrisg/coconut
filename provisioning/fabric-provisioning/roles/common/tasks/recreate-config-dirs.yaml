@@ -1,0 +1,93 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Delete crypto-config directory
+  file:
+    state: absent
+    path: "{{ item }}"
+  loop:
+    - "{{ LOCAL_BINARY_PATH }}/crypto-config"
+    - "{{ LOCAL_CRYPTO_PATH }}/crypto-config"
+  tags:
+  - bm-set
+- name: Create channel-artifacts directory
+  file:
+    state: directory
+    path: "{{ item }}"
+  loop:
+    - "{{ LOCAL_BINARY_PATH }}/channel-artifacts"
+    - "{{ LOCAL_CRYPTO_PATH }}/channel-artifacts"
+  tags:
+  - bm-set
+- name: Delete temporary directory for peer configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/peer_configs state=absent"
+  tags:
+  - bm-set
+- name: Create temporary directory for peer configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/peer_configs state=directory"
+  tags:
+  - bm-set
+- name: Delete temporary directory for orderer configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/orderer_configs state=absent"
+  tags:
+  - bm-set
+- name: Create temporary directory for orderer configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/orderer_configs state=directory"
+  tags:
+  - bm-set
+- name: Delete temporary directory for ZooKeeper configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/zookeeper_configs state=absent"
+  tags:
+  - bm-set
+- name: Create temporary directory for ZooKeeper configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/zookeeper_configs state=directory"
+  tags:
+  - bm-set
+- name: Delete temporary directory for Kafka configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/kafka_configs state=absent"
+  tags:
+  - bm-set
+- name: Create temporary directory for Kafka configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/kafka_configs state=directory"
+  tags:
+  - bm-set
+- name: Delete temporary directory for cli configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/cli_configs state=absent"
+  tags:
+  - bm-set
+- name: Create temporary directory for cli configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/cli_configs state=directory"
+  tags:
+  - bm-set
+- name: Delete temporary directory for CA configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/ca_configs state=absent"
+  tags:
+  - bm-set
+- name: Create temporary directory for CA configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/ca_configs state=directory"
+  tags:
+  - bm-set
+- name: Delete temporary directory for CouchDB configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/couchdb_configs state=absent"
+  tags:
+  - bm-set
+- name: Create temporary directory for CouchDB configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/couchdb_configs state=directory"
+  tags:
+  - bm-set
+- name: Delete temporary directory for Blockchain-Explorer configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/blockchain-explorer_configs state=absent"
+  tags:
+  - bm-set
+- name: Create temporary directory for Blockchain-Explorer configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/blockchain-explorer_configs state=directory"
+  tags:
+  - bm-set
+- name: Delete temporary directory for Caliper configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/caliper_configs state=absent"
+  tags:
+  - bm-set
+- name: Create temporary directory for Caliper configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/caliper_configs state=directory"
+  tags:
+  - bm-set

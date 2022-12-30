@@ -1,0 +1,61 @@
+version: '2'
+
+volumes:
+  {{ item }}:
+
+#networks:
+#  {{ NET_NAME }}:
+
+{% if BRIDGED_MODE -%}
+networks:
+  fabric:
+{% endif %}
+
+services:
+  {{ item }}:
+    image: hyperledger/fabric-zookeeper
+    {% if BRIDGED_MODE -%}
+    network_mode: "bridge"
+    ports:
+      - {{ 2200 + groups['zookeeper'].index(inventory_hostname) }}:{{ 2200 + groups['zookeeper'].index(inventory_hostname) }}
+      - {{ 20000 + groups['zookeeper'].index(inventory_hostname) }}:{{ 20000 + groups['zookeeper'].index(inventory_hostname) }}
+      - {{ 21000 + groups['zookeeper'].index(inventory_hostname) }}:{{ 21000 + groups['zookeeper'].index(inventory_hostname) }}
+#      - {{ 2200 + my_idx }}:{{ 2200 + my_idx }}
+#      - {{ 20000 + my_idx }}:{{ 20000 + my_idx }}
+#      - {{ 21000 + my_idx }}:{{ 21000 + my_idx }}
+#      - {{ 2200 + my_idx }}:2181
+#      - {{ 20000 + my_idx }}:2888
+#      - {{ 21000 + my_idx }}:3888
+    extra_hosts:
+    {% for host in groups['zookeeper'] -%}
+     - "{{ host }}:{{ hostvars[host]['serverip'] }}"
+    {% endfor -%}
+
+    {% else -%}
+    network_mode: "host"
+    {% endif %}
+
+    container_name: {{ item }}
+    restart: always
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+      - ZOO_MY_ID={{ 100 + groups['zookeeper'].index(inventory_hostname) }}
+#      - ZOO_MY_ID={{ 100 + my_idx }}
+      - ZOO_SERVERS={% for host in groups['zookeeper'] %}server.{{ 100 + loop.index0 }}={{ hostvars[host]['inventory_hostname'] }}:{{ 20000 + loop.index0 }}:{{ 21000 + loop.index0 }} {% endfor %}
+#    ports:
+#      - {{ 2200 + groups['zookeeper'].index(inventory_hostname) }}:2181
+#      - {{ 20000 + groups['zookeeper'].index(inventory_hostname) }}:2888
+#      - {{ 21000 + groups['zookeeper'].index(inventory_hostname) }}:3888
+#      - {{ 2200 + my_idx }}:2181
+#      - {{ 20000 + my_idx }}:2888
+#      - {{ 21000 + my_idx }}:3888
+    volumes:
+      - {{ MAIN_CONFIG_PATH }}/zookeeper_configs/{{ item }}_config.cfg:/conf/zoo.cfg
+      - /etc/timezone:/etc/timezone
+      - /etc/security/limits.conf:/etc/security/limits.conf
+      - /etc/sysctl.conf:/etc/sysctl.conf
+      {% if not BUILD_TELEGRAF -%}
+      - {{ MAIN_CONFIG_PATH }}/telegraf/usr/bin/telegraf:/bin/telegraf
+      {% endif -%}
+      - {{ MAIN_CONFIG_PATH }}/zookeeper_configs/telegraf_{{ item }}.conf:/etc/telegraf/telegraf.conf
+      - /var/lib/docker:/var/lib/docker

@@ -1,0 +1,24 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Copy keys file
+  copy:
+   src: "{{ QUORUM_KEYS_LOCATION }}"
+   dest: "{{ QUORUM_KEYS_DESTINATION }}"
+  delegate_to: localhost
+  throttle: 1
+  tags:
+  - bm-set
+- name: Copy contract file
+  copy:
+   src: "{{ QUORUM_CONTRACT_FILE_LOCATION }}"
+   dest: "{{ QUORUM_CONTRACT_FILE_DESTINATION }}"
+  delegate_to: localhost
+  throttle: 1
+  tags:
+  - bm-set
+#- name: "Restart Quorum nodes (dirty workaround for stuck/pending/queued transactions)"
+#  shell: "$(which sshpass) -p {{ item.value.password }} ssh -o StrictHostKeyChecking=no {{ item.value.user }}@{{ item.value.ip }} \"docker exec --interactive {{ item.key }} bash -c 'killall geth || true && for i in nodes/*/*StartScript.sh; do cd \\$(dirname \\$i) && bash ./\\$(basename \\$i) && cd - || exit && sleep 15; done'\""
+#  delegate_to: localhost
+#  run_once: true
+#  loop: "{{ lookup('dict', nodes) }}"

@@ -1,0 +1,129 @@
+package com.template.flows;
+
+import co.paralleluniverse.fibers.Suspendable;
+import com.template.contracts.MemoryContract;
+import com.template.states.MemoryState;
+import net.corda.core.contracts.Command;
+import net.corda.core.flows.*;
+import net.corda.core.identity.Party;
+import net.corda.core.transactions.SignedTransaction;
+import net.corda.core.transactions.TransactionBuilder;
+import net.corda.core.utilities.ProgressTracker;
+
+import java.security.PublicKey;
+import java.util.ArrayList;
+import java.util.List;
+
+@InitiatingFlow
+@StartableByRPC
+public class MemoryFlow extends FlowLogic<Void> {
+
+    private static final String field = "!\"#$%&'()*+,-./0123456789:;" +
+            "<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+
+    private final String[] args;
+    private final String function;
+    private Party notary;
+    private List<Party> counterParties;
+
+    private final ProgressTracker.Step memory;
+    private final ProgressTracker progressTracker;
+
+    @Override
+    public ProgressTracker getProgressTracker() {
+        return this.progressTracker;
+    }
+
+    public MemoryFlow(final String functionConstructor, final List<String> args, final Party notaryConstructor,
+                      final List<Party> counterPartiesConstructor) {
+
+        if (notaryConstructor != null) {
+            notary = notaryConstructor;
+        }
+        if (counterPartiesConstructor != null) {
+            counterParties = counterPartiesConstructor;
+        }
+
+        function = functionConstructor;
+
+        this.args = args.toArray(new String[0]);
+
+        String signature = this.args[4];
+
+        memory = new ProgressTracker.Step("memory " + signature);
+        progressTracker = new ProgressTracker(memory);
+    }
+
+    @Suspendable
+    private void memory(int lenOut, int lenIn, int firstChar, int length) throws FlowException {
+
+        String[][] arr = new String[lenOut][];
+        for (int i = 0; i < arr.length; i++) {
+            arr[i] = new String[lenIn];
+        }
+
+        for (int i = 0; i < lenOut; i++) {
+            for (int j = 0; j < lenIn; j++) {
+                arr[i][j] = getChars(firstChar + i + j, length + i + j);
+            }
+        }
+
+        TransactionBuilder txBuilder = new TransactionBuilder(notary);
+
+        MemoryState outputState = new MemoryState(getOurIdentity(), counterParties);
+        txBuilder.addOutputState(outputState);
+        List<PublicKey> requiredSigners = new ArrayList<>();
+        counterParties.forEach(party -> requiredSigners.add(party.getOwningKey()));
+        Command<MemoryContract.Dummy> command = new Command<>(new MemoryContract.Dummy(), requiredSigners);
+        txBuilder.addCommand(command);
+
+        SignedTransaction signedTx = getServiceHub().signInitialTransaction(txBuilder);
+        List<FlowSession> sessionList = new ArrayList<>();
+        counterParties.forEach(party -> sessionList.add(initiateFlow(party)));
+
+        SignedTransaction fullySignedTx;
+        try {
+            fullySignedTx = subFlow(new CollectSignaturesFlow(
+                    signedTx, sessionList, CollectSignaturesFlow.tracker()));
+            subFlow(new FinalityFlow(fullySignedTx, sessionList));
+        } catch (FlowException ex) {
+            getLogger().error("Error while handling flow " + ex.getMessage());
+            throw new FlowException("Error while handling flow " + this.getRunId() + " " + ex.getMessage());
+        }
+
+        progressTracker.setCurrentStep(memory);
+    }
+
+    private String getChars(int firstChar, int length) {
+
+        StringBuilder stringBuilder = new StringBuilder();
+        for (int i = firstChar; i < length + firstChar; i++) {
+            stringBuilder.append(field.toCharArray()[(firstChar + i) % (field.length())]);
+        }
+        return stringBuilder.toString();
+    }
+
+    @Suspendable
+    @Override
+    public Void call() throws FlowException {
+
+        if ("Memory".equals(function)) {
+
+            if (args.length != 5) {
+                throw new FlowException("Call to Memory must have 5 parameters");
+            }
+
+            int lenOut = Integer.parseInt(args[0]);
+            int lenIn = Integer.parseInt(args[1]);
+            int firstChar = Integer.parseInt(args[2]);
+            int length = Integer.parseInt(args[3]);
+
+
+            memory(lenOut, lenIn, firstChar, length);
+            return null;
+        }
+
+        throw new FlowException("Not yet implemented function called");
+
+    }
+}

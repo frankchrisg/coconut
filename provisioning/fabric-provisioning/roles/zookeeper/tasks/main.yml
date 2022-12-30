@@ -1,0 +1,7 @@
+- name: Pull ZooKeeper image
+  docker_image:
+    name: "hyperledger/fabric-zookeeper:{{ THIRDPARTY }}"
+    tag: "fabric-zookeeper"
+  tags:
+  - bm-set
+- import_tasks: provide-zookeeper.yaml

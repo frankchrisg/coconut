@@ -1,0 +1,182 @@
+CONFIG_PATH: "templates"
+MAIN_PATH: "{{ playbook_dir }}"
+MAIN_CONFIG_PATH: "{{ MAIN_PATH }}/{{ CONFIG_PATH }}"
+
+BASE_PATH: "/home/parallels/FINAL_graphene_corda_latest_xxx"
+CHOWN_PATH: "/home/parallels/FINAL_graphene_corda_latest_xxx/"
+
+DOCKERFILE_PATH: "{{MAIN_CONFIG_PATH}}/ubuntu-graphene"
+DOCKERFILE_NAME: "ubuntu-graphene"
+
+REMOVE_GRAPHENE: false
+
+GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH: "{{ BASE_PATH }}/graphene-files"
+GRAPHENE_PATH: "{{ BASE_PATH }}/graphene"
+GRAPHENE_CLONE: no
+GRAPHENE_FORCE_CLONE: "yes"
+
+GRAPHENE_CUSTOM_OPERATIONS_FILE_PATH: "{{ BASE_PATH }}/custom-operations"
+GRAPHENE_CUSTOM_OPERATIONS_TMP_DIR: "/tmp/"
+GRAPHENE_CUSTOM_OPERATIONS_TMP_DIR_FULL: "{{ GRAPHENE_CUSTOM_OPERATIONS_TMP_DIR }}custom-operations"
+GRAPHENE_CUSTOM_OPERATIONS: no
+
+GRAPHENE_HEAD: "195881c32f5626c623250f1ae6127bac8f9a0cbb"
+# "195881c32f5626c623250f1ae6127bac8f9a0cbb"
+# "f9ec116a6ff66b37c29d755d94f7b14a02e9ef41" #testnet
+# "c0951cad0d95405cf6450ab05ebe7e563c4cdc3a"
+
+P2P_START_PORT: 5000
+#10000
+#"SEED_NODE_ARRAY":
+#  []
+SET_SEED_NODES: true
+
+RPC_START_PORT: 11000
+RPC_WALLET_HTTP_PORT: 20000
+#13000
+RPC_WALLET_PORT: 30000
+#14000
+GENESIS_FILE_LOCATION: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/genesis"
+
+# 0 default
+IO_THREADS: 0
+
+# Whether allow API clients to subscribe to universal object creation and removal events
+ENABLE_SUBSCRIBE_TO_ALL: true
+# Whether to enable tracking of votes of standby witnesses and committee members. Set it to true to provide accurate data to API clients, set to false for slightly better performance.
+ENABLE_STANDBY_VOTES_TRACKING: true
+
+ENABLE_DELAYED_NODES: false
+WALLET_LOGGING_PARAMETERS: "--logs-rpc-console-level info --logs-rpc-file 1 --logs-rpc-file-level info --logs-rpc-file-name {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/datadir/{{ inventory_hostname }}-wallet.jsonrpc.log"
+
+MAKE_PROCESS: false
+COPY_BINARIES: false
+
+MAKE_JOBS: 16
+MAKE_RETRIES: 5
+
+COPY_PREPARED_WALLET: false
+
+CHAIN_ID_POLL_DELAY: 3
+CHAIN_ID_POLL_RETRIES: 10
+
+BLOCK_CREATION_POLL_RETRIES: 100
+BLOCK_CREATION_POLL_DELAY: 10
+BLOCK_ASSURANCE_LIMIT: 5
+
+ADDITIONAL_START_PARAMETERS: ""
+
+# witness plugin
+PLUGINS: "witness market_history grouped_orders api_helper_indexes {% if ENABLE_ELASTICSEARCH %}elasticsearch es_objects{% else %}account_history{% endif %}"
+
+ENABLE_STALE_PRODUCTION: false
+
+PRIVATE_KEY_FILE: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/initial-witness-keys_and_addresses.txt"
+
+ELASTICSEARCH_IMAGE_VERSION: "7.6.1"
+KIBANA_IMAGE_VERSION: "7.6.1"
+
+# Percent of witnesses (0-100) that must be participating in order to produce blocks, default: 33
+REQUIRED_PARTICIPATION: 0
+
+# Default: 100
+MAX_OPS_PER_ACCOUNT: 10000
+# Default: 1
+PARTIAL_OPERATIONS: 1
+
+ENABLE_ELASTICSEARCH: false
+ELASTICSEARCH_URL: "{% if groups['statistics'].0 is defined %}http://{{ groups['statistics'].0 }}:9200/{% else %}\"\"{% endif %}"
+ELASTICSEARCH_USE_VISITOR: true
+ELASTICSEARCH_PREFIX: "bitshares-"
+ELASTICSEARCH_OPERATION_OBJECT: true
+ELASTICSEARCH_START_ES_AFTER_BLOCK: 0
+ELASTICSEARCH_OPERATION_STRING: true
+ELASTICSEARCH_KEEP_ONLY_CURRENT: false
+# Mode of operation: only_save(0), only_query(1), all(2) - Default: 0
+ELASTICSEARCH_MODE: 0
+OVERWRITE_ES_FILE: false
+
+# RPC endpoint of a trusted validating node (required for delayed_node)
+# TRUSTED_NODE:
+
+ROTATION_INTERVAL_DEFAULT: 6000
+ROTATION_LIMIT_DEFAULT: 70
+ROTATION_INTERVAL_P2P: 6000
+ROTATION_LIMIT_P2P: 70
+ROTATION_INTERVAL_RPC: 6000
+ROTATION_LIMIT_RPC: 70
+
+WS_USER: "''''"
+#"\'\'"
+WS_PASSWORD: "''''"
+#"\'\'"
+
+SLEEP_BEFORE_NODE_START: "1s"
+
+LOGGING_LEVEL_DEFAULT: "debug"
+LOGGING_LEVEL_P2P: "debug"
+LOGGING_LEVEL_RPC: "debug"
+
+# Same pattern values will create the same keys
+INITIAL_ACCOUNTS_PREFIX: "test- suffix-0:412"
+INITIAL_WITNESS_CANDIDATES_PREFIX: "test- suffix-0:16"
+INITIAL_COMMITTEE_CANDIDATES_PREFIX: "test- suffix-0:3"
+INITIAL_AND_MIN_WITNESSES: 15
+
+GENESIS_TIMESTAMP: 0
+
+TESTNET_DIR_NAME: "network-testdir"
+
+MAX_CORE_SUPPLY: 1000000000000000
+ASSET_SYMBOL: "TEST"
+# Default 11
+MIN_COMMITTEE_MEMBER_COUNT: 3
+# Default 11
+INITIAL_ACTIVE_WITNESSES: "{{ INITIAL_AND_MIN_WITNESSES }}"
+# Default 11
+MIN_WITNESS_COUNT: "{{ INITIAL_AND_MIN_WITNESSES }}"
+NUM_SPECIAL_ACCOUNTS: 0
+NUM_SPECIAL_ASSETS: 0
+BLOCK_INTERVAL: 5
+COMMITTEE_PROPOSAL_REVIEW_PERIOD: 1209600
+MAXIMUM_TRANSACTION_SIZE: 16384
+MAXIMUM_BLOCK_SIZE: 16000000
+MAXIMUM_TIME_UNTIL_EXPIRATION: 86400
+MAXIMUM_PROPOSAL_LIFETIME: 2419200
+MAXIMUM_WITNESS_COUNT: 1001
+MAXIMUM_COMMITTEE_COUNT: 1001
+COUNT_NON_MEMBER_VOTES: true
+MAX_PREDICATE_OPCODE: 1
+
+CLI_SLEEP_TIME: 10
+
+TIMESTAMP_GENESIS: "{{ lookup('pipe', 'date -d \"-72 hours\" +\"%Y-%m-%dT10:00:00\"') }}"
+#TIMESTAMP_GENESIS: "{{ lookup('pipe', 'date -d \"-72 hours\" +\"%Y-%m-%dT%H:%M:00\"') }}"
+#+%Y-%m-%dT%H:%M:00 -d \"-2 hours\"
+
+# Should be used in Docker bridged mode See the templates for network communication in this mode
+NET_NAME: "uncomment_in_file_for_bridged_mode"
+BRIDGED_MODE: true
+
+PRUNE_DOCKER: true
+
+REBUILD_UBUNTU_GRAPHENE_DOCKERFILE: "no"
+
+# How many tasks should be run in parallel during execution of Ansible
+RUN_LOCAL: false
+SERIAL_EXECUTION_NUMBER: 0
+SERIAL_EXECUTION: "{% if RUN_LOCAL -%}1{% else %}{{SERIAL_EXECUTION_NUMBER}}{% endif %}"
+# The default hostset for Ansible, can be overwritten or set Please pay attention for variable prioritization, see:
+# https://docs.ansible.com/ansible/latest/user_guide/playbooks_variables.html
+# hostset: "local"
+
+INFLUXDB_ADMIN_USER: "admin"
+INFLUXDB_ADMIN_PASSWORD: "password123"
+INFLUXDB_USER: "lrdata"
+INFLUXDB_USER_PASSWORD: "password123"
+INFLUXDB_VERSION: "1.8.4"
+REBUILD_GRAFANA_DOCKERFILE: "no"
+DOCKERFILE_GRAFANA: "grafana"
+
+INIT: true
+COMMON: true

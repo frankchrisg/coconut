@@ -1,0 +1,6 @@
+DoNothing & 605.04 & 10.43 & 313.00 \\
+KeyValue-Set & 243.13 & 14.06 & 315.00 \\
+KeyValue-Get & 338.46 & 13.27 & 209.00 \\
+Banking-Create & 258.05 & 13.93 & 315.67 \\
+Banking-Send & 320.10 & 13.40 & 254.33 \\
+Banking-Balance & 362.50 & 12.83 & 224.67 \\

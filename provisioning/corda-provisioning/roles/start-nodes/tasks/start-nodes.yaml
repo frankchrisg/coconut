@@ -1,0 +1,122 @@
+- name: Create jmx2graphite configuration files
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/jmx2graphite.j2"
+    dest: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/{{ inventory_hostname }}_application.conf"
+  tags:
+  - bm-set
+
+- name: Handle corda files
+  block:
+    - name: Check if jmx2graphite exists
+      stat:
+        path: "{{ CORDA_PATH }}/jmx2graphite-1.4.3-javaagent.jar"
+      register: stat_result
+    - name: Download jmx2graphite jar
+      get_url:
+        url: "https://github.com/logzio/jmx2graphite/releases/download/v1.4.3/jmx2graphite-1.4.3-javaagent.jar"
+        dest: "{{ CORDA_PATH }}/"
+      when: not stat_result.stat.exists
+  throttle: 1
+  tags:
+  - bm-set
+  
+- name: Create node configuration
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/node-compose.j2"
+    dest: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}-compose.yaml"
+  tags:
+  - bm-set
+- name: Copy telegraf configuration to host
+  copy:
+    src: "{{ item }}"
+    dest: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}_telegraf.conf"
+  with_fileglob:
+    - "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}_telegraf.conf"
+  tags:
+  - bm-set
+- name: Find files on remote machine (Nodes)
+  find:
+    paths: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/"
+    patterns: "{{ inventory_hostname }}-*.yaml"
+  register: output
+  tags:
+  - bm-set
+
+- name: Stop node containers
+  docker_compose:
+    project_src: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/"
+    files: "{{ item.path | basename }}"
+    remove_volumes: yes
+    state: absent
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-rem
+- name: Run node containers
+  docker_compose:
+    project_src: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/"
+    files: "{{ item.path | basename }}"
+    recreate: always
+  loop: "{{ output.files|flatten(levels=1) }}"
+  retries: "{{ RETRIES_DOCKER }}"
+  delay: "{{ DELAY_DOCKER }}"
+  register: docker_res
+  until: "docker_res.services[inventory_hostname][inventory_hostname].state.status | default('') == 'running'"
+  # {{ docker_res.results.0.services[inventory_hostname][inventory_hostname].state.status }}
+  throttle: 1
+  tags:
+  - bm-run
+
+#- name: Run node containers
+#  shell: "cd {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/ && $(which docker-compose) -f {{ item.path | basename }} up -d"
+#  loop: "{{ output.files|flatten(levels=1) }}"
+#  retries: "{{ RETRIES_DOCKER }}"
+#  delay: "{{ DELAY_DOCKER }}"
+#  register: docker_res
+#  until: docker_res.rc | default('') == 0
+
+- import_tasks: setup_cordapps.yaml
+
+#- name: Initialise telegraf
+  #shell: "echo 'curl -sL https://repos.influxdata.com/influxdb.key | apt-key add - && apt-add-repository \"deb https://repos.influxdata.com/ubuntu bionic stable\" && apt-get update && apt-get install -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" telegraf && service telegraf restart' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+#  shell: "echo 'service telegraf restart' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+#  tags:
+#  - bm-set
+#- name: Set java to a version compatible to corda
+#  shell: 'echo "apt install -y openjdk-8-jdk && echo 2 | update-alternatives --config java" | docker exec -i {{ inventory_hostname }} /bin/bash -'
+
+- name: Add hostname to hosts
+  shell: 'echo "echo \"127.0.0.1\" $(hostname) >> /etc/hosts" | docker exec -i {{ inventory_hostname }} /bin/bash -'
+  tags:
+  - bm-set
+- name: Create start script
+  shell: 'echo "echo \"#!/bin/bash\n$(which java) -jar {{ CORDA_PATH }}/jmx2graphite.jar {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/{{ inventory_hostname }}_application.conf >/dev/null 2>&1 &\nsleep {{ NODE_START_TIME }} && $(which java) \\\"-Dcapsule.jvm.args=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address={{ DT_SOCKET_START_PORT + groups[''node''].index(inventory_hostname) }} -javaagent:{{ CORDA_PATH }}/drivers/{{ JOLOKIA_JAR }}=host=0.0.0.0,port={{ JOLOKIA_START_PORT + groups[''node''].index(inventory_hostname) }}\\\" \\\"-Dname={{ PARTY }}{{ groups[''node''].index(inventory_hostname) }}\\\" -jar {{ CORDA_PATH }}/corda.jar >> /corda-startup.txt 2>&1 &\" > {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh" | docker exec -i {{ inventory_hostname }} /bin/bash -'
+  tags:
+  - bm-set
+
+- name: Add IP addresses to container
+  shell: "echo \"echo {{ hostvars[item]['serverip'] }} {{item}} >> /etc/hosts\" | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: BRIDGED_MODE and hostvars[item]['serverip'] is defined
+  loop: "{{ groups.all }}"
+  tags:
+  - bm-set
+
+#  shell: 'echo "echo \"#!/bin/bash\n$(which java) -jar {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/jmx2graphite.jar {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/{{ inventory_hostname }}_application.conf >/dev/null 2>&1 &\n$(which java) \\\"-Dcapsule.jvm.args=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address={{ DT_SOCKET_START_PORT + groups[''node''].index(inventory_hostname) }} -javaagent:drivers/{{ JOLOKIA_JAR }}=host={{ hostvars[inventory_hostname][''serverip''] }},port={{ JOLOKIA_START_PORT + groups[''node''].index(inventory_hostname) }}\\\" \\\"-Dname={{ PARTY }}{{ groups[''node''].index(inventory_hostname) }}\\\" -jar {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/corda.jar >/dev/null 2>&1 &\" > {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh" | docker exec -i {{ inventory_hostname }} /bin/bash -'
+
+#-  name: "Create start script"
+#  shell: "echo \"echo \\\"#!/bin/bash\\n$(which java) -jar {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/jmx2graphite.jar {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/{{ inventory_hostname }}_application.conf >/dev/null 2>&1 & \\n$(which java) \\\\\\\"-Dcapsule.jvm.args=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address={{ DT_SOCKET_START_PORT + groups['node'].index(inventory_hostname) }} -javaagent:drivers/{{ JOLOKIA_JAR }}=host={{ hostvars[inventory_hostname]['serverip'] }},port={{ JOLOKIA_START_PORT + groups['node'].index(inventory_hostname) }}\\\\\\\" \\\\\\\"-Dname={{ PARTY }}{{ groups['node'].index(inventory_hostname) }}\\\\\\\" -jar {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/corda.jar >/dev/null 2>&1 &\\ \\n$(which kill) ps aux | grep corda.jar | grep -v 'grep' | awk '{print $2}' && sleep {{ NODE_RESTART_TIME }} \\n$(which java) \\\\\\\"-Dcapsule.jvm.args=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address={{ DT_SOCKET_START_PORT + groups['node'].index(inventory_hostname) }} -javaagent:drivers/{{ JOLOKIA_JAR }}=host={{ hostvars[inventory_hostname]['serverip'] }},port={{ JOLOKIA_START_PORT + groups['node'].index(inventory_hostname) }}\\\\\\\" \\\\\\\"-Dname={{ PARTY }}{{ groups['node'].index(inventory_hostname) }}\\\\\\\" -jar {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/corda.jar >/dev/null 2>&1 &\\\" > {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh\" | docker exec -i {{ inventory_hostname }} /bin/bash -"
+- name: Start node
+  shell: "echo '$(which chmod) +x {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh && /bin/bash {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh' | docker exec -iw {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }} {{ inventory_hostname }} /bin/bash -"
+  tags:
+  - bm-run
+
+- name: Replace telegraf log name
+# shell: "echo 'cp /etc/telegraf/telegraf.conf /etc/telegraf/telegraf.conf_mod && sed -i 's/HOSTNAME_TO_REPLACE/$(hostname)/g' /etc/telegraf/telegraf.conf_mod && cp -f /etc/telegraf/telegraf.conf_mod /etc/telegraf/telegraf.conf && service telegraf restart' | docker exec -iw {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }} {{ inventory_hostname }} /bin/bash -" - name: Stop node
+  shell: "echo 'cp -f /etc/telegraf/telegraf_cst.conf /etc/telegraf/telegraf.conf && sed -i \"s/HOSTNAME_TO_REPLACE/$(hostname)/g\" /etc/telegraf/telegraf.conf && service telegraf restart' | docker exec -iw {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }} {{ inventory_hostname }} /bin/bash -"
+  tags:
+  - bm-set
+
+#- name: Wait for node
+#  shell: "echo '$(which sleep) {{ NODE_RESTART_TIME }}' | docker exec -iw {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }} {{ inventory_hostname }} /bin/bash -"
+#- name: "Start node #2"
+#  shell: "echo '$(which chmod) +x {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh && /bin/bash {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh' | docker exec -iw {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }} {{ inventory_hostname }} /bin/bash -"

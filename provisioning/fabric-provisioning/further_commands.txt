@@ -1,0 +1,8 @@
+Just some more or less important commands:
+
+- find ./crypto/*/*/tlsca/ -type f -name tlsca.*.pem | xargs cat # to get all certificates from the corresponding folder
+- sh -c "truncate -s 0 /var/lib/docker/containers/*/*-json.log" # to clear Docker container logs as they may grow very large
+- ansible containerHost -m command -a "docker stop peer0.peerone.com" # basically arbitrary commands can be executed on the hosts, this command could be used to check how the network behaves when a container "crashes"
+- ansible benchmarking-client -m copy -a "src=/home/hyperledger-provisioning/chatApplication-0.0.1-SNAPSHOT-jar-with-dependencies.jar dest=/home/hyperledger-provisioning/chatApplication-0.0.1-SNAPSHOT-jar-with-dependencies.jar" # almost the same as the one above but shows how to copy relevant files like a newly compiled JAR file
+- ./runBenchmark.sh target/ chatApplication-0.0.1-SNAPSHOT-jar-with-dependencies.jar edu.hm.dako.chat.benchmarking.BenchmarkingUserInterfaceSimulation ~/client_new/ hostName-
+ ca.pem 50 5 # how to run the Benchmarking Shell Script manually, see the script contents for the specific parameters

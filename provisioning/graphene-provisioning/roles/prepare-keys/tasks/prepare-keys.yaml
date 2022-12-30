@@ -1,0 +1,74 @@
+# active_key is equal to memo_key
+- name: Execute get_dev_key to create custom keys
+  shell: "{{ GRAPHENE_PATH }}/programs/genesis_util/get_dev_key {{ item }}"
+  loop: "{{ [INITIAL_ACCOUNTS_PREFIX, INITIAL_WITNESS_CANDIDATES_PREFIX, INITIAL_COMMITTEE_CANDIDATES_PREFIX] | flatten(levels=1 )}}"
+  register: keys_results
+  tags:
+  - bm-set
+- name: Output get_dev_key command
+  debug:
+    msg: "{{ GRAPHENE_PATH }}/programs/genesis_util/get_dev_key {{ item }}"
+  loop: "{{ [INITIAL_ACCOUNTS_PREFIX, INITIAL_WITNESS_CANDIDATES_PREFIX, INITIAL_COMMITTEE_CANDIDATES_PREFIX] | flatten(levels=1 )}}"
+  tags:
+  - bm-set
+- name: Output created keys part 1
+  debug:
+    msg: "{{ item.stdout_lines }}"
+  loop: "{{ keys_results.results }}"
+  register: tosplit
+  tags:
+  - bm-set
+- name: Output created keys part 2
+  debug:
+    msg: "{{ item.item.stdout_lines }};"
+  loop: "{{ tosplit.results }}"
+  register: split
+  tags:
+  - bm-set
+- name: Write keys to specific files
+  lineinfile:
+    line: "{{ item.item.item.stdout_lines | string }}"
+    create: "yes"
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{% if my_idx==0 %}initial-accounts{% elif my_idx==1 %}initial-witness{% elif my_idx==2 %}initial-committee{% endif %}-keys_and_addresses.txt"
+  loop: "{{ split.results }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Remove various characters
+  local_action: replace path="{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item.0 }}" replace='' regexp="{{ item.1 }}"
+  loop: "{{ [\"initial-accounts-keys_and_addresses.txt\", \"initial-witness-keys_and_addresses.txt\", \"initial-committee-keys_and_addresses.txt\"] | product(['\\[', ']', '}', '{', \"'\", \",,\"]) | list }}"
+  tags:
+  - bm-set
+- name: Replace new line
+  replace:
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}"
+    regexp: ' '
+    replace: '\n'
+  loop: "{{ [\"initial-accounts-keys_and_addresses.txt\", \"initial-witness-keys_and_addresses.txt\", \"initial-committee-keys_and_addresses.txt\"] }}"
+  tags:
+  - bm-set
+- name: Replace unicode sign
+  replace:
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}"
+    regexp: '^u'
+    replace: ''
+  loop: "{{ [\"initial-accounts-keys_and_addresses.txt\", \"initial-witness-keys_and_addresses.txt\", \"initial-committee-keys_and_addresses.txt\"] }}"
+  tags:
+  - bm-set
+- name: Output destination of private key file
+  debug:
+    msg: "From: {{ PRIVATE_KEY_FILE }} to: {{ PRIVATE_KEY_FILE }}_copy"
+  tags:
+  - bm-set
+- name: Copy private key file (local, backup)
+  local_action: "copy src='{{ PRIVATE_KEY_FILE }}' dest='{{ PRIVATE_KEY_FILE }}_copy'"
+  tags:
+  - bm-set
+- name: Copy private key file (backup)
+  copy:
+    src: "{{ PRIVATE_KEY_FILE }}"
+    dest: "{{ PRIVATE_KEY_FILE }}_copy"
+  tags:
+  - bm-set

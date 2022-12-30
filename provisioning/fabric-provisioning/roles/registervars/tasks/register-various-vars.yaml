@@ -1,0 +1,60 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Get all peer organizations in the directory
+  find:
+    paths: "{{ LOCAL_CRYPTO_PATH }}/crypto-config/peerOrganizations"
+    file_type: directory
+  register: dir
+  tags:
+  - bm-set
+- name: Register dir values
+  debug:
+    msg: "dir values {{ dir }}"
+  tags:
+  - bm-set
+- name: Get all peer files from the CA directory of the peer organizations
+  find:
+    paths: "{{ item.path }}/peers"
+    file_type: directory
+  loop: "{{ dir.files|flatten(levels=1) }}"
+  register: items
+  tags:
+  - bm-set
+- name: Register items values
+  debug:
+    msg: "items values {{ items }}"
+  tags:
+  - bm-set
+- name: Get all key files from the CA directory of the peer organizations
+  find:
+    paths: "{{ item.path }}/ca"
+    patterns: "*_sk"
+    file_type: file
+  loop: "{{ dir.files|flatten(levels=1) }}"
+  register: itemsca
+  tags:
+  - bm-set
+- name: Get all -cert.pem files   
+  find:
+    paths: "{{ LOCAL_CRYPTO_PATH }}/crypto-config"
+    patterns: "*-cert.pem"
+    file_type: file
+    recurse: yes
+  register: cert_pem_files
+  tags:
+  - bm-set
+- name: Get all _sk files   
+  find:
+    paths: "{{ LOCAL_CRYPTO_PATH }}/crypto-config"
+    patterns: "*_sk"
+    file_type: file
+    recurse: yes
+  register: sk_files
+  tags:
+  - bm-set
+- name: Register itemsca values
+  debug:
+    msg: "itemsca values {{ itemsca }}"
+  tags:
+  - bm-set

@@ -1,0 +1,298 @@
+- name: Copy complete static-nodes file and genesis file to remote host
+  copy:
+    src: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}"
+  loop: "{{ ['genesis.json', 'static-nodes.json'] | flatten(levels=1 )}}"
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Copy genesis file to container (non-validator)
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/genesis.json {{ inventory_hostname }}:/nodes/non-validator-node-{{ item }}/genesis.json"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Copy static-nodes file to container (validator)
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes.json {{ inventory_hostname }}:/nodes/node-{{ item }}/static-nodes.json"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+
+- name: Add IP addresses to container
+  shell: "echo \"echo {{ hostvars[item]['serverip'] }} {{item}} >> /etc/hosts\" | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: BRIDGED_MODE and hostvars[item]['serverip'] is defined
+  loop: "{{ groups.all }}"
+  tags:
+  - bm-set
+
+- name: Copy static-nodes file to container (validator, data directory)
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes.json {{ inventory_hostname }}:/nodes/node-{{ item }}/data/static-nodes.json"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+
+- name: Copy static-nodes file to container (non-validator)
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes.json {{ inventory_hostname }}:/nodes/non-validator-node-{{ item }}/static-nodes.json"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+
+- name: Copy static-nodes file to container (non-validator, data directory)
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes.json {{ inventory_hostname }}:/nodes/non-validator-node-{{ item }}/data/static-nodes.json"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+
+- name: Create tessera config
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/tessera-config.j2"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname}}-node-{{ item }}-config.json"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: ENABLE_TESSERA
+  tags:
+  - bm-set
+- name: Create tessera config non-validator-node
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/tessera-non-validator-config.j2"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname}}-non-validator-node-{{ item }}-config.json"
+  when: CONSENSUS_NAME == 'istanbulbft' and ENABLE_TESSERA
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Copy tessera config
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname}}-node-{{ item }}-config.json {{ inventory_hostname }}:/nodes/node-{{ item }}/{{ inventory_hostname}}-node-{{ item }}-config.json"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: ENABLE_TESSERA
+  tags:
+  - bm-set
+- name: Copy tessera config non-validator-node
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname}}-non-validator-node-{{ item }}-config.json {{ inventory_hostname }}:/nodes/non-validator-node-{{ item }}/{{ inventory_hostname}}-non-validator-node-{{ item }}-config.json"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+
+  when: CONSENSUS_NAME == 'istanbulbft' and ENABLE_TESSERA
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Register remote host for constellation
+  debug:
+    msg: "{%if groups['node'][groups['node'].index(inventory_hostname) +1] is defined %}
+    {{groups['node'][groups['node'].index(inventory_hostname) +1]}}:{{ CONSTELLATION_PORT + (groups['node'].index(inventory_hostname) + 1)  * 100 | int }}
+    {%elif groups['node'][groups['node'].index(inventory_hostname) -1] is defined %}
+    {{groups['node'][groups['node'].index(inventory_hostname) -1]}}:{{ CONSTELLATION_PORT + (groups['node'].index(inventory_hostname) - 1)  * 100 | int }}
+    {%else%}{{groups['node'][groups['node'].index(inventory_hostname)]}}:{{ CONSTELLATION_PORT + groups['node'].index(inventory_hostname)  * 100 | int }}{%endif%}"
+  register: remoteHost
+  when: ENABLE_CONSTELLATION
+  tags:
+  - bm-set
+- name: Register hostset
+  debug:
+    msg: "{{ groups['node']}}"
+  register: host
+  when: ENABLE_CONSTELLATION
+  tags:
+  - bm-set
+# disable tls, otherwise ip:port won't be mapped to the certificate
+- name: Create command to execute constellation in the container
+  copy: 
+    content: "#!/bin/bash\n
+    apt install -y libsodium23 libleveldb-dev lsof\n
+    /bin/cp -rf /usr/lib/x86_64-linux-gnu/libsodium.so.23 /usr/lib/x86_64-linux-gnu/libsodium.so.18\n
+    yes \"\" | {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/constellation/constellation-node --generatekeys=/nodes/node-{{ item }}/node-{{ item }}\n
+    nohup {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/constellation/constellation-node --tls=off --url=http://{{ inventory_hostname }}:{{ CONSTELLATION_PORT + host.msg.index(inventory_hostname) * 100 + my_idx }}/ --port={{ CONSTELLATION_PORT + host.msg.index(inventory_hostname) * 100 + my_idx }} --workdir=/nodes/node-{{ item }} --socket=/nodes/node-{{ item }}/tm.ipc --publickeys=/nodes/node-{{ item }}/node-{{ item }}.pub --privatekeys=/nodes/node-{{ item }}/node-{{ item }}.key --othernodes=\"http://{{ remoteHost.msg | trim }}/\" >> /nodes/node-{{ item }}/constellation.log 2>&1 &\n
+    exit 0"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/constellation-node-{{ item }}.sh"
+    mode: "0755"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: ENABLE_CONSTELLATION
+  tags:
+  - bm-set
+- name: Create command to execute constellation in the container (non-validator)
+  copy: 
+    content: "#!/bin/bash\n
+    apt install -y libsodium23 libleveldb-dev lsof\n
+    /bin/cp -rf /usr/lib/x86_64-linux-gnu/libsodium.so.23 /usr/lib/x86_64-linux-gnu/libsodium.so.18\n
+    yes \"\" | {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/constellation/constellation-node --generatekeys=/nodes/non-validator-node-{{ item }}/non-validator-node-{{ item }}\n
+    nohup {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/constellation/constellation-node --tls=off --url=http://{{ inventory_hostname }}:{{ CONSTELLATION_PORT + host.msg.index(inventory_hostname) * 100 + my_idx + additional_nodes_per_container[host.msg.index(inventory_hostname)].number | int }}/ --port={{ CONSTELLATION_PORT + host.msg.index(inventory_hostname) * 100 + my_idx + additional_nodes_per_container[host.msg.index(inventory_hostname)].number | int }} --workdir=/nodes/node-{{ item }} --socket=/nodes/non-validator-node-{{ item }}/tm.ipc --publickeys=/nodes/non-validator-node-{{ item }}/non-validator-node-{{ item }}.pub --privatekeys=/nodes/non-validator-node-{{ item }}/non-validator-node-{{ item }}.key --othernodes=\"http://{{ remoteHost.msg | trim }}/\" >> /nodes/non-validator-node-{{ item }}/constellation.log 2>&1 &\n
+    exit 0"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/constellation_non_validator-non-validator-node-{{ item }}.sh"
+    mode: "0755"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  when: CONSENSUS_NAME == 'istanbulbft' and ENABLE_CONSTELLATION
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Copy constellation start script to container
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/constellation-node-{{ item }}.sh {{ inventory_hostname }}:/nodes/node-{{ item }}/constellation-node-{{ item }}.sh"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: ENABLE_CONSTELLATION
+  tags:
+  - bm-set
+- name: Copy constellation start script to container (non-validator node)
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/constellation_non_validator-non-validator-node-{{ item }}.sh {{ inventory_hostname }}:/nodes/non-validator-node-{{ item }}/constellation_non_validator-non-validator-node-{{ item }}.sh"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft' and ENABLE_CONSTELLATION
+  tags:
+  - bm-set
+- name: Execute Constellation
+  shell: 'echo "/bin/sh /nodes/node-{{ item }}/constellation-node-{{ item }}.sh" | docker exec -i {{ inventory_hostname }} /bin/bash -'
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: ENABLE_CONSTELLATION
+  tags:
+  - bm-set
+- name: Execute constellation (non-validator node)
+  shell: 'echo "/bin/sh /nodes/non-validator-node-{{ item }}/constellation_non_validator-non-validator-node-{{ item }}.sh" | docker exec -i {{ inventory_hostname }} /bin/bash -'
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+
+  when: CONSENSUS_NAME == 'istanbulbft' and ENABLE_CONSTELLATION
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Execute Tessera
+  shell: 'echo "mkdir -p /nodes/node-{{ item }}t && cd /nodes/node-{{ item }}t &&
+  { echo \"{{ PASSWORD_TESSERA }}\" echo \"{{ PASSWORD_TESSERA }}\"; } | /usr/bin/java -jar {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/tessera.jar -keygen -filename node-{{ item }} &&
+  /usr/bin/java -jar {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/tessera.jar -configfile /nodes/node-{{ item }}/{{ inventory_hostname}}-node-{{ item }}-config.json >> /nodes/node-{{ item }}/tessera.log 2>&1 &" | docker exec -i {{ inventory_hostname }} /bin/bash -'
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: ENABLE_TESSERA
+  tags:
+  - bm-set
+- name: Execute Tessera (non-validator node)
+  shell: 'echo "mkdir -p /nodes/non-validator-node-{{ item }}t && cd /nodes/non-validator-node-{{ item }}t && 
+  { echo \"{{ PASSWORD_TESSERA }}\" echo \"{{ PASSWORD_TESSERA }}\"; } | /usr/bin/java -jar {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/tessera.jar -keygen -filename non-validator-node-{{ item }} &&
+  /usr/bin/java -jar {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/tessera.jar -configfile /nodes/non-validator-node-{{ item }}/{{ inventory_hostname}}-non-validator-node-{{ item }}-config.json >> /nodes/non-validator-node-{{ item }}/tessera.log 2>&1 &" | docker exec -i {{ inventory_hostname }} /bin/bash -'
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft' and ENABLE_TESSERA
+  tags:
+  - bm-set
+- name: Start node
+  shell: "echo '/bin/bash /nodes/node-{{ item }}/node-{{ item }}-{{ CONSENSUS_NAME }}-StartScript.sh' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-run
+- name: Start node non-validator
+  shell: "echo '/bin/bash /nodes/non-validator-node-{{ item }}/non-validator-node-{{ item }}-{{ CONSENSUS_NAME }}-StartScript.sh' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  when: CONSENSUS_NAME == 'istanbulbft'
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-run
+#- name: Install jq
+#  shell: "echo 'apt -y update && apt -y install jq' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+#  tags:
+#  - bm-set
+#- name: Add accounts
+#  shell: "echo 'for d in /nodes/* ; do for i in $(seq 1 {{ NUMBER_OF_ACCOUNTS_PER_NODE }}); do echo $({{ BUILD_PATH }}/geth account new --password /passwordfile.txt {% if LIGHTKDF is defined and LIGHTKDF | bool %} --lightkdf {% endif %} --datadir \"$d\") & done; done && for pid in ${pids[*]}; do wait \"$pid\"; done && unset pids' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+#- name: Set account creation script
+#shell: docker exec -i {{ inventory_hostname}} bash -c "echo 'for d in /nodes/* ; do for i in \$(seq 1 {{ NUMBER_OF_ACCOUNTS_PER_NODE }}); do echo \$({{ BUILD_PATH }}/geth account new --password /passwordfile.txt {% if LIGHTKDF is defined and LIGHTKDF | bool %} --lightkdf {% endif %} --datadir \"\$d\") & done; done && for pid in \${pids[*]}; do wait \"\$pid\"; done && unset pids' > /account-creation.sh"
+#  tags:
+#  - bm-set
+
+- name: Create account-creation script
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/account-creation.j2"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/account-creation.sh"
+  tags:
+  - bm-set
+- name: Copy account-creation script
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/account-creation.sh {{ inventory_hostname }}:/account-creation.sh"
+  tags:
+  - bm-set
+
+- name: Add accounts
+  shell: "echo 'chmod +x account-creation.sh && sh account-creation.sh || true' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  register: status
+  failed_when: status.rc != 0
+  tags:
+  - bm-set
+
+- name: Handle keys and wallets
+  block:
+    - name: Save wallets to temporary file
+      shell: "echo 'for d in /nodes/*node-*/keystore/*; do portVar=$(grep -Phor \"(?<=(--wsport)).*(?=--wsapi)\" $(dirname $d)/../); cat $d | jq --compact-output --arg wsport $portVar '\"'\"'. + {wsport: $wsport}'\"'\"' >> /wallets-{{ inventory_hostname}}.json; done' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+    - name: Save keys to file
+      shell: "echo 'cat /wallets-{{ inventory_hostname}}.json | jq -r '\"'\"'[.address, .wsport]|@csv'\"'\"' | tr \",\" \" \" | while read line || [[ -n $line ]]; do echo -e $(awk '\"'\"'{print $1}'\"'\"' <<< $line | tr -d \"\\\"\") {{ ACCOUNT_PASSWORD }} {{ hostvars[inventory_hostname][\"serverip\"] }} $(awk '\"'\"'{print $2}'\"'\"' <<< $line | tr -d \"\\\"\")  >> keys-{{ inventory_hostname}}.txt; done' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+    - name: Save wallets to file
+      shell: "echo 'cat /wallets-{{ inventory_hostname}}.json | while read line || [[ -n $line ]]; do echo -e $(echo $line | jq --compact-output '\"'\"'del(.wsport)'\"'\"' | tr -d \" \" ) {{ ACCOUNT_PASSWORD }} {{ hostvars[inventory_hostname][\"serverip\"] }} $(echo $line | jq .wsport | tr -d \"\\\"\") >> wallets-{{ inventory_hostname}}.txt; done' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+    - name: Register keys output
+      shell: "echo 'cat /keys-{{ inventory_hostname}}.txt' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+      register: keys
+    - name: Register wallets output
+      shell: "echo 'cat /wallets-{{ inventory_hostname}}.txt' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+      register: wallets
+    - name: Write wallets to file
+      local_action: lineinfile dest={{ MAIN_CONFIG_PATH }}/wallets.txt line="{{ item }}" state=present insertafter=EOF create=True
+      loop: "{{ wallets.stdout_lines }}"
+      loop_control:
+        loop_var: item
+        index_var: my_idx
+    - name: Write keys to file
+      local_action: lineinfile dest={{ MAIN_CONFIG_PATH }}/keys.txt line="{{ item }}" state=present insertafter=EOF create=True
+      loop: "{{ keys.stdout_lines }}"
+      loop_control:
+        loop_var: item
+        index_var: my_idx
+  throttle: 1
+  tags:
+  - bm-set
+- name: Initialise telegraf 
+#  shell: "echo 'apt update && apt-get install -y software-properties-common gnupg curl &&  curl -sL https://repos.influxdata.com/influxdb.key | apt-key add - && apt-add-repository \"deb https://repos.influxdata.com/ubuntu bionic stable\" && apt-get install -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" telegraf && service telegraf restart' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  shell: "echo 'service telegraf restart' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  tags:
+  - bm-set

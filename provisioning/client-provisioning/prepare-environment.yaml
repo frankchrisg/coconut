@@ -1,0 +1,9 @@
+- import_playbook: registervars.yaml hostlist=client
+- hosts: "{{ hostset }}"
+  serial: "{% if SERIAL_EXECUTION|int > 0 %}{{ SERIAL_EXECUTION|int }}{% else %}{{ SERIAL_EXECUTION_PB }}{% endif %}"
+  roles:
+    - prepare-environment
+  vars_files:
+    - "vars/common-vars.yaml"
+    - "vars/client-vars.yaml"
+    - "vars/diem-vars.yaml"

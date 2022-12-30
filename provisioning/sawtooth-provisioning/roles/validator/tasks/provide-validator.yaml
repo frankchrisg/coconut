@@ -1,0 +1,139 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Copy additional configuration files to host
+  copy:
+    src: "{{ item }}"
+    dest: "{{ MAIN_CONFIG_PATH }}/additional_configs/"
+  with_fileglob:
+    - "{{ MAIN_CONFIG_PATH }}/additional_configs/{{ inventory_hostname }}_*"
+  tags:
+  - bm-set
+- name: Copy cli configuration to host
+  copy:
+    src: "{{ item }}"
+    dest: "{{ MAIN_CONFIG_PATH }}/cli_configs/"
+  with_fileglob:
+    - "{{ MAIN_CONFIG_PATH }}/cli_configs/{{ inventory_hostname }}_cli.toml"
+  tags:
+  - bm-set
+- name: Copy validator configuration to host
+  copy:
+    src: "{{ item }}"
+    dest: "{{ MAIN_CONFIG_PATH }}/validator_configs/"
+  with_fileglob:
+    - "{{ MAIN_CONFIG_PATH }}/validator_configs/{{ inventory_hostname }}_validator.toml"
+  tags:
+  - bm-set
+- name: Copy rest api configuration to host
+  copy:
+    src: "{{ item }}"
+    dest: "{{ MAIN_CONFIG_PATH }}/rest_configs/"
+  with_fileglob:
+    - "{{ MAIN_CONFIG_PATH }}/rest_configs/{{ inventory_hostname }}_rest.toml"
+  tags:
+  - bm-set
+- name: Copy logging configuration to host
+  copy:
+    src: "{{ item }}"
+    dest: "{{ MAIN_CONFIG_PATH }}/log_configs/"
+  with_fileglob:
+    - "{{ MAIN_CONFIG_PATH }}/log_configs/{{ inventory_hostname }}_log.toml"
+  tags:
+  - bm-set
+- name: Create validator configuration path
+  file:
+    state: directory
+    path: "{{ BASE_PATH }}/validators/{{ inventory_hostname }}"
+  tags:
+  - bm-set
+- name: List all files
+  find:
+    paths: "{{ MAIN_CONFIG_PATH }}/additional_configs/"
+    patterns: "*"
+  register: tmp_glob
+  tags:
+  - bm-set
+- name: "Copy additional configuration files:"
+  copy:
+    src: "{{ item.path }}"
+    dest: "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item.path.split('_')[-2].split('/')[-1] }}/{{ item.path.split('_')[-2].split('/')[-1] }}_{{ item.path.split('_')[-1] }}"
+    remote_src: "yes"
+  loop: "{{ tmp_glob.files|flatten(levels=1) }}"
+  when: inventory_hostname == item.path.split('_')[-2].split('/')[-1]
+  tags:
+  - bm-set
+- name: "Copy validator configuration files"
+  copy:
+    src: "{{ item[0][0] }}/{{ item[0][1] }}_{{ item[1] }}.toml"
+    dest: "{{ BASE_PATH }}/validators/{{ item[0][1] }}/{{ item[0][1] }}_{{ item[1] }}.toml"
+    remote_src: "yes"
+  loop: "{{ ['{{ MAIN_CONFIG_PATH }}/cli_configs', '{{ MAIN_CONFIG_PATH }}/log_configs', '{{ MAIN_CONFIG_PATH }}/rest_configs', '{{ MAIN_CONFIG_PATH }}/validator_configs']|product(groups['validator'])|list|product(['validator', 'rest', 'cli', 'log'])|list }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: item[0][0].endswith(item[1]~'_configs') and inventory_hostname == item[0][1]
+  tags:
+  - bm-set
+- name: Copy telegraf configuration to host
+  copy:
+    src: "{{ item }}"
+    dest: "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}/{{ inventory_hostname }}_telegraf.conf"
+  with_fileglob:
+    - "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}/{{ inventory_hostname }}_telegraf.conf"
+  tags:
+  - bm-set
+- name: Copy validator docker compose configuration to host
+  copy:
+    src: "{{ item }}"
+    dest: "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}_compose.yaml"
+  with_fileglob:
+    - "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}_compose.yaml"
+  tags:
+  - bm-set
+- name: Find files on remote machine (Validators)
+  find:
+    paths: "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}"
+    patterns: "{{ inventory_hostname }}_compose.yaml"
+  register: output
+  tags:
+  - bm-set
+
+- name: Stop validator containers
+  docker_compose:
+    project_src: "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}"
+    files: "{{ item.path | basename }}"
+    remove_volumes: yes
+    state: absent
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-rem
+- name: Run validator containers
+#  docker_service:
+#    project_src: "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}"
+#    files: "{{ item.path | basename }}"
+#  loop: "{{ output.files|flatten(levels=1) }}"
+  docker_compose:
+    project_src: "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}"
+    files: "{{ item.path | basename }}"
+    recreate: always
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-run
+
+- name: Add IP addresses to container
+  shell: "echo \"echo {{ hostvars[item]['serverip'] }} {{item}} >> /etc/hosts\" | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: BRIDGED_MODE and hostvars[item]['serverip'] is defined
+  loop: "{{ groups.all }}"
+  tags:
+  - bm-set
+
+##- name: Retrieve systemctl alternative and start all required sawtooth services"
+# && systemctl restart sawtooth-rest-api && systemctl restart sawtooth-validator && systemctl restart sawtooth-settings-tp && systemctl restart sawtooth-identity-tp && systemctl restart sawtooth-xo-tp-python && systemctl restart sawtooth-intkey-tp-python
+##  shell: "echo 'wget https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement/master/files/docker/systemctl.py -O /usr/local/bin/systemctl && chmod +x /usr/local/bin/systemctl' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+- name: "Generate user keys and validator keys"
+  shell: "echo 'sawtooth keygen sawtooth_key --force && sawadm keygen --force' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  tags:
+  - bm-set

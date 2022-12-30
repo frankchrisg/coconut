@@ -1,0 +1,41 @@
+version: "2"
+
+volumes:
+  cli.{{ item[0].1.path.split('/')[-1] }}:
+
+#networks:
+#  {{ NET_NAME }}:
+
+services:
+  cli.{{ item[0].1.path.split('/')[-1] }}:
+    container_name: cli.{{ item[0].1.path.split('/')[-1] }}
+    image: hyperledger/fabric-tools:{{ IMAGE_TAG }}
+    network_mode: "host"
+    restart: always
+    tty: true
+    stdin_open: true
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+      - GOPATH=/opt/gopath
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - FABRIC_LOGGING_SPEC=DEBUG
+      - CORE_PEER_ID=cli.{{ item[0].1.path.split('/')[-1] }}
+      - CORE_PEER_ADDRESS=peer0.{{ item[0].1.path.split('/')[-1] }}:{{ 7000 + 100*my_idx }}
+      - CORE_PEER_LOCALMSPID={{ item[1].id }}
+      - CORE_PEER_TLS_ENABLED=true
+      - GODEBUG=netdns=go
+      - CORE_PEER_TLS_CERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/{{ item[0].1.path.split('/')[-1] }}/peers/peer0.{{ item[0].1.path.split('/')[-1] }}/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/{{ item[0].1.path.split('/')[-1] }}/peers/peer0.{{ item[0].1.path.split('/')[-1] }}/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/{{ item[0].1.path.split('/')[-1] }}/peers/peer0.{{ item[0].1.path.split('/')[-1] }}/tls/ca.crt
+      - CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/{{ item[0].1.path.split('/')[-1] }}/users/Admin@{{ item[0].1.path.split('/')[-1] }}/msp
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: sh -c '/bin/bash'
+    volumes:
+      - /var/run/:/host/var/run/
+      - {{ LOCAL_CHAINCODE_PATH }}:/opt/gopath/src/github.com/chaincode
+      - {{ LOCAL_CRYPTO_PATH }}/crypto-config:/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto
+      - {{ LOCAL_CRYPTO_PATH }}/channel-artifacts:/opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts
+      - /etc/timezone:/etc/timezone
+      - /etc/security/limits.conf:/etc/security/limits.conf
+      - /etc/sysctl.conf:/etc/sysctl.conf
+    #- {{ LOCAL_SAMPLE_PATH }}/scripts:/opt/gopath/src/github.com/hyperledger/fabric/peer/scripts/

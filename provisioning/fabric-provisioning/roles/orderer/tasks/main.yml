@@ -1,0 +1,7 @@
+- name: Pull orderer image
+  docker_image:
+    name: "hyperledger/fabric-orderer:{{ IMAGE_TAG }}"
+    tag: "fabric-orderer"
+  tags:
+  - bm-set
+- import_tasks: provide-orderer.yaml

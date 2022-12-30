@@ -1,0 +1,3 @@
+- import_tasks: recreate-config-dirs.yaml
+- import_tasks: get-various-files.yaml
+- import_tasks: create-local-files.yaml

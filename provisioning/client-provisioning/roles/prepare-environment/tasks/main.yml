@@ -1,0 +1,110 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Create main config path
+  file:
+    path: "{{ MAIN_CONFIG_PATH }}"
+    state: directory
+  tags:
+  - bm-set
+- name: Install java
+  apt: name={{ OPEN_JDK }} state=latest
+  become: true
+- name: Set Java version
+  alternatives:
+    name: java
+    path: "{{ JAVA_PATH }}"
+  become: true
+#- name: Delete client path
+#  file:
+#    path: "{{ CLIENT_PATH }}"
+#    state: absent
+#- name: Create client path
+#  file:
+#    path: "{{ CLIENT_PATH }}"
+#    state: directory
+
+- name: Find  files to delete
+  find:
+    paths: "{{ CLIENT_PATH }}"
+    excludes: "client_skel,grafana,hosts.j2,telegraf.j2,telegraf-container.j2"
+  register: files_to_delete
+  tags:
+  - bm-set
+- name: Delete found files
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ files_to_delete.files }}"
+  tags:
+  - bm-set
+- name: Create additional config path
+  file:
+    path: "{{ CLIENT_PATH }}/additional_configs"
+    state: directory
+  tags:
+  - bm-set
+
+- name: Check jars path
+  stat:
+    path: "{{ JAR_PATH_JARS }}/"
+  register: jar_path
+  tags:
+  - bm-set
+- name: Create jars path
+  file:
+    path: "{{ JAR_PATH_JARS }}"
+    state: directory
+  tags:
+  - bm-set
+- name: Copy jars
+  synchronize:
+    src: "{{ JAR_PATH_JARS }}/"
+    dest: "{{ JAR_PATH_JARS }}/"
+  when: not jar_path.stat.exists or FORCE_COPY_JARS
+  tags:
+  - bm-set
+- import_tasks: quorum.yaml
+  when: BASIC_SYSTEM == "quorum"
+- import_tasks: graphene.yaml
+  when: BASIC_SYSTEM == "graphene"
+- import_tasks: fabric.yaml
+  when: BASIC_SYSTEM == "fabric"
+
+- include_vars: diem-vars.yaml
+  when: BASIC_SYSTEM == "diem"
+- import_tasks: diem.yaml
+  when: BASIC_SYSTEM == "diem"
+
+- name: Copy content from additional configs
+  copy:
+    src: "{{ CLIENT_PATH }}/additional_configs/"
+    dest: "{{ CLIENT_PATH }}/client_skel/"
+  delegate_to: localhost
+  tags:
+  - bm-set
+
+- name: Copy relevant files
+  synchronize:
+    src: "{{ CLIENT_PATH }}/client_skel/"
+    dest: "{{ CLIENT_PATH }}/{{ inventory_hostname }}/"
+    rsync_opts:
+      - "--exclude=logs"
+      - "--exclude=jars"
+  tags:
+  - bm-set
+- name: Build the JVM container image
+  docker_image:
+    path: "{{ CLIENT_PATH }}/{{ inventory_hostname }}"
+    dockerfile: "JVM-Dockerfile"
+    name: client-jvm
+    force: "{{ REBUILD_JVM_IMAGE_IF_EXISTS }}"
+    nocache: "yes"
+    buildargs:
+      jdk: "{{ OPEN_JDK }}"
+      jdk_full: "{{ OPEN_JDK_FULL }}"
+  when: BUILD_JVM_IMAGE
+
+- name: Run external postgres playbook
+  shell: "cd {{ POSTGRES_PLAYBOOK_PATH}} && $(which ansible-playbook) {{ POSTGRES_PLAYBOOK_FILE }}"
+  when: hostvars[inventory_hostname]['postgres'] is defined and hostvars[inventory_hostname]['postgres'] | bool

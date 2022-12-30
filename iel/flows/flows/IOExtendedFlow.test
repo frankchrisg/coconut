@@ -1,0 +1,283 @@
+package com.template.flows;
+
+import co.paralleluniverse.fibers.Suspendable;
+import com.template.contracts.IOExtendedContract;
+import com.template.states.IOExtendedState;
+import net.corda.core.contracts.Command;
+import net.corda.core.contracts.StateAndRef;
+import net.corda.core.flows.*;
+import net.corda.core.identity.Party;
+import net.corda.core.node.services.Vault;
+import net.corda.core.node.services.vault.PageSpecification;
+import net.corda.core.node.services.vault.QueryCriteria;
+import net.corda.core.node.services.vault.Sort;
+import net.corda.core.transactions.SignedTransaction;
+import net.corda.core.transactions.TransactionBuilder;
+import net.corda.core.utilities.ProgressTracker;
+
+import java.io.IOException;
+import java.security.PublicKey;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+
+@InitiatingFlow
+@StartableByRPC
+public class IOExtendedFlow extends FlowLogic<Void> {
+
+    private static final String chars = "!\"#$%&'()*+,-./0123456789:;" +
+            "<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+
+    private final String[] args;
+    private final String function;
+    private Party notary;
+    private List<Party> counterParties;
+
+    private ProgressTracker.Step write;
+    private ProgressTracker.Step writeEx;
+    private ProgressTracker.Step scan;
+    private ProgressTracker.Step scanEx;
+    private ProgressTracker.Step revertScan;
+    private ProgressTracker.Step revertScanEx;
+    private ProgressTracker progressTracker;
+
+    private QueryCriteria.VaultQueryCriteria vaultQueryCriteria = new QueryCriteria.VaultQueryCriteria();
+    private PageSpecification pageSpecification = new PageSpecification();
+    private Sort sort = new Sort(Collections.emptySet());
+
+    @Override
+    public ProgressTracker getProgressTracker() {
+        return this.progressTracker;
+    }
+
+    public IOExtendedFlow(final String functionConstructor, final List<String> args, final Party notaryConstructor,
+                          final List<Party> counterPartiesConstructor,
+                          final QueryCriteria.VaultQueryCriteria queryCriteriaConstructor,
+                          final PageSpecification pageSpecificationConstructor, final Sort sortConstructor) {
+
+        if (queryCriteriaConstructor != null) {
+            vaultQueryCriteria = queryCriteriaConstructor;
+        }
+        if (pageSpecificationConstructor != null) {
+            pageSpecification = pageSpecificationConstructor;
+        }
+        if (sortConstructor != null) {
+            sort = sortConstructor;
+        }
+
+        if (notaryConstructor != null) {
+            notary = notaryConstructor;
+        }
+        if (counterPartiesConstructor != null) {
+            counterParties = counterPartiesConstructor;
+        }
+
+        function = functionConstructor;
+
+        this.args = args.toArray(new String[0]);
+
+        String signature = this.args[this.args.length - 1];
+
+        if ("Write".equals(function)) {
+            write = new ProgressTracker.Step("storage/write " + signature);
+            writeEx = new ProgressTracker.Step("ioExtended/write/exist " + signature);
+            progressTracker = new ProgressTracker(write, writeEx);
+        } else if ("Scan".equals(function)) {
+            scan = new ProgressTracker.Step("storage/scan " + signature);
+            scanEx = new ProgressTracker.Step("ioExtended/scan/doesntexist " + signature);
+            progressTracker = new ProgressTracker(scan, scanEx);
+        } else if ("RevertScan".equals(function)) {
+            revertScan = new ProgressTracker.Step("storage/revertScan " + signature);
+            revertScanEx = new ProgressTracker.Step("ioExtended/revertScan/doesntexist " + signature);
+            progressTracker = new ProgressTracker(revertScan, revertScanEx);
+        }
+    }
+
+    @Suspendable
+    private StateAndRef<IOExtendedState> getByKey(String key) {
+
+        Vault.Page<IOExtendedState> ioExtendedStatePage = getServiceHub().getVaultService().queryBy(IOExtendedState.class,
+                vaultQueryCriteria, pageSpecification, sort);
+
+        List<StateAndRef<IOExtendedState>> states = ioExtendedStatePage.getStates();
+
+        for (final StateAndRef<IOExtendedState> state : states) {
+            if (key.equals(state.getState().getData().getsK())) {
+                return state;
+            }
+        }
+        return null;
+
+        //return states.filter(state -> key.equals(state.getState().getData().getsK())).findAny().orElse(null);
+    }
+
+    @Suspendable
+    private void write(String[] args) throws FlowException {
+        if (args.length != 4) {
+            throw new FlowException("Call to Write must have 4 parameters");
+        }
+
+        int size = Integer.parseInt(args[0]);
+        int startKey = Integer.parseInt(args[1]);
+        int retLen = Integer.parseInt(args[2]);
+
+        //ByteArrayOutputStream stateArr = new ByteArrayOutputStream();
+        List<byte[]> stateArr = new ArrayList<>();
+
+                    TransactionBuilder txBuilder = new TransactionBuilder(notary);
+
+        for (int i = 0; i < size; i++) {
+            String sK = String.valueOf(startKey + i);
+
+            StateAndRef<IOExtendedState> byKeyEx = getByKey(sK);
+            if (byKeyEx != null) {
+                progressTracker.setCurrentStep(writeEx);
+                return;
+            }
+
+            byte[] val = getVal(startKey + i, retLen);
+
+            IOExtendedState outputState = new IOExtendedState(getOurIdentity(), counterParties, sK, val);
+            txBuilder.addOutputState(outputState);
+
+            /*StateAndRef<IOExtendedState> byKey = getByKey(sK);
+            if (byKey != null) {
+                txBuilder.addInputState(byKey);
+            }*/
+
+            /*try {
+                stateArr.write(val);
+            } catch (IOException ex) {
+                throw new FlowException("Unable to create byte array");
+            }*/
+            stateArr.add(val);
+        }
+
+                    List<PublicKey> requiredSigners = new ArrayList<>();
+                    counterParties.forEach(party -> requiredSigners.add(party.getOwningKey()));
+                    Command<IOExtendedContract.Write> command = new Command<>(new IOExtendedContract.Write(), requiredSigners);
+                    txBuilder.addCommand(command);
+
+                    SignedTransaction signedTx = getServiceHub().signInitialTransaction(txBuilder);
+                    List<FlowSession> sessionList = new ArrayList<>();
+                    counterParties.forEach(party -> sessionList.add(initiateFlow(party)));
+
+                    SignedTransaction fullySignedTx;
+                    try {
+                        fullySignedTx = subFlow(new CollectSignaturesFlow(
+                                signedTx, sessionList, CollectSignaturesFlow.tracker()));
+                        subFlow(new FinalityFlow(fullySignedTx, sessionList));
+                    } catch (FlowException ex) {
+                        getLogger().error("Error while handling flow " + ex.getMessage());
+                        throw new FlowException("Error while handling flow " + this.getRunId() + " " + ex.getMessage());
+                    }
+
+        /*try {
+            stateArr.close();
+        } catch (IOException ex) {
+            throw new FlowException("Unable to close stream");
+        }*/
+        progressTracker.setCurrentStep(write);
+    }
+
+    @Suspendable
+    private byte[] getVal(int k, int retLen) {
+        StringBuilder stringBuilder = new StringBuilder();
+        for (int i = 0; i < retLen; i++) {
+            stringBuilder.append(chars.toCharArray()[(k + i) % (chars.length())]);
+        }
+        return stringBuilder.toString().getBytes();
+    }
+
+    @Suspendable
+    private void scan(String[] args) throws FlowException {
+        if (args.length != 3) {
+            throw new FlowException("Call to Scan must have 3 parameters");
+        }
+
+        int size = Integer.parseInt(args[0]);
+        int startKey = Integer.parseInt(args[1]);
+
+        //ByteArrayOutputStream stateArr = new ByteArrayOutputStream();
+        List<byte[]> stateArr = new ArrayList<>();
+        for (int i = 0; i < size; i++) {
+            String sK = String.valueOf(startKey + i);
+            StateAndRef<IOExtendedState> byKey = getByKey(sK);
+
+            if (byKey == null) {
+                progressTracker.setCurrentStep(scanEx);
+                return;
+            }
+
+            /*try {
+                stateArr.write(Objects.requireNonNull(byKey).getState().getData().getVal());
+            } catch (IOException ex) {
+                throw new FlowException("Unable to create byte array");
+            }*/
+            stateArr.add(Objects.requireNonNull(byKey).getState().getData().getVal());
+        }
+        /*try {
+            stateArr.close();
+        } catch (IOException ex) {
+            throw new FlowException("Unable to close stream");
+        }*/
+        progressTracker.setCurrentStep(scan);
+    }
+
+    @Suspendable
+    private void revertScan(String[] args) throws FlowException {
+        if (args.length != 3) {
+            throw new FlowException("Call to RevertScan must have 3 parameters");
+        }
+
+        int size = Integer.parseInt(args[0]);
+        int startKey = Integer.parseInt(args[1]);
+
+        //ByteArrayOutputStream stateArr = new ByteArrayOutputStream();
+        List<byte[]> stateArr = new ArrayList<>();
+        for (int i = 0; i < size; i++) {
+            String sK = String.valueOf(startKey + size - i - 1);
+            StateAndRef<IOExtendedState> byKey = getByKey(sK);
+
+            if (byKey == null) {
+                progressTracker.setCurrentStep(revertScanEx);
+                return;
+            }
+
+            /*try {
+                stateArr.write(Objects.requireNonNull(byKey).getState().getData().getVal());
+            } catch (IOException ex) {
+                throw new FlowException("Unable to create byte array");
+            }*/
+            stateArr.add(Objects.requireNonNull(byKey).getState().getData().getVal());
+        }
+        /*try {
+            stateArr.close();
+        } catch (IOException ex) {
+            throw new FlowException("Unable to close stream");
+        }*/
+        progressTracker.setCurrentStep(revertScan);
+    }
+
+    @Suspendable
+    @Override
+    public Void call() throws FlowException {
+
+        if ("Write".equals(function)) {
+            write(args);
+            return null;
+        }
+        if ("Scan".equals(function)) {
+            scan(args);
+            return null;
+        }
+        if ("RevertScan".equals(function)) {
+            revertScan(args);
+            return null;
+        }
+
+        throw new FlowException("Not yet implemented function called");
+
+    }
+}

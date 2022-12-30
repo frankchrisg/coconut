@@ -1,0 +1,15 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Add IP addresses of hosts
+  lineinfile:
+    dest: /etc/hosts
+    regexp: '.*{{ item }}$'
+    line: "{{ hostvars[item]['serverip'] }} {{item}}"
+    state: present
+  when: hostvars[item]['serverip'] is defined
+  loop: "{{ groups.all }}"
+  become: true
+  tags:
+  - bm-set
+

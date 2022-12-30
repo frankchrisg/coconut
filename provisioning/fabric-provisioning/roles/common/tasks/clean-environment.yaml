@@ -1,0 +1,37 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Restart Docker daemon
+  systemd:
+    state: restarted
+    daemon_reload: yes
+    name: docker
+  become: true
+- name: Information regarding environment cleanup
+  debug:
+    msg: >-
+      Please make sure to adjust the variable PRUNE_DOCKER. The variable is
+      currently set to: {{ PRUNE_DOCKER }}.
+- name: Get all docker containers
+  command: docker ps -aq
+  register: containers
+- name: Remove docker containers
+  command: "docker rm -f {{ item }}"
+  when: PRUNE_DOCKER
+  loop: "{{ containers.stdout_lines }}"
+- name: Prune Docker networks
+  command: docker network prune -f
+  when: PRUNE_DOCKER
+- name: Prune docker containers
+  command: docker container prune -f
+  when: PRUNE_DOCKER
+- name: Prune docker volumes
+  command: docker volume prune -f
+  when: PRUNE_DOCKER
+- name: Prune docker system
+  command: docker system prune -f
+  when: PRUNE_DOCKER
+- name: Delete central log directory
+  file: "path={{ CENTRAL_LOG_PATH }} state=absent"
+- name: Create central log directory
+  file: "path={{ CENTRAL_LOG_PATH }} state=directory"

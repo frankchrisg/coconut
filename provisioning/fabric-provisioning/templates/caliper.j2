@@ -1,0 +1,130 @@
+{
+	"caliper" : {
+		"blockchain": "fabric",
+			"command" : {
+				"start": "echo 'Started Caliper custom network' && counter=`docker ps -a | grep {{ caliper_chaincodes.0.path }} | awk '{print $1}'`; if [ ! -z $counter ]; then echo 'Chaincode container running, this may cause problems depending on your scenario' ; fi",
+				"end" : "echo 'Ended Caliper custom network - an improvement could be to stop, destroy and start (install and instantiate) the Caliper Chaincode during this process'"
+			}
+	},
+		"fabric": {
+			"cryptodir": "{{ LOCAL_CRYPTO_PATH }}/crypto-config",
+			"network": {
+
+				"orderer": {
+					{% for orderer in certificates_config_orderer %}
+					{% set outer = loop.index0 -%}
+					{% set endOne = loop.last -%}
+					{% for number in range(0, orderer.number) %}
+					"url": "grpcs://orderer{{ loop.index0 }}.{{ orderer.domain }}:{{ ORDERER_START_PORT + loop.index0 }}",
+						"mspid": "{{ orderer.id }}",
+						"domain": "{{ orderer.domain }}",
+				        "user": {
+	      				  "key": "{{ key.files[0].path }}",
+        				  "cert": "{{ LOCAL_CRYPTO_PATH }}/crypto-config/ordererOrganizations/{{ CALIPER_PREFERRED_ORDERER }}/users/Admin@{{ CALIPER_PREFERRED_ORDERER }}/msp/signcerts/Admin@{{ CALIPER_PREFERRED_ORDERER }}-cert.pem"
+      },
+						"msp": "{{ LOCAL_CRYPTO_PATH }}/crypto-config/ordererOrganizations/{{ orderer.domain }}/msp/",
+						"server-hostname": "orderer{{ loop.index0 }}.{{ orderer.domain }}",
+						"tls_cacerts": "{{ LOCAL_CRYPTO_PATH }}/crypto-config/ordererOrganizations/{{ orderer.domain }}/orderers/orderer{{ loop.index0 }}.{{ orderer.domain }}/tls/ca.crt"
+				}
+				{%- if CALIPER_ONLY_ONE_ORDERER -%}
+				{% break %}
+				{% endif %}
+
+				{% endfor %}
+
+				{{ ',' if CALIPER_ONLY_ONE_ORDERER else '' }}
+				{%- if CALIPER_ONLY_ONE_ORDERER -%}
+				{% break %}
+				{% endif %}
+				{{ '' if endOne and loop.last else ',' }}
+				{% endfor %}
+
+				{% for organization in organizations_config %}
+				{% if 'orderer_organization' != organization.type %}
+				"{{ organization.name|lower }}": {
+
+					{% set list = organization.mspdir.split('/') %}
+					"name": "{{ organization.name }}",
+						"mspid": "{{ organization.tag }}",
+						"domain": "{{ list[-1] }}",
+						"msp": "{{ organization.mspdir }}/msp/",
+						"ca": {
+							"url": "ca.{{ list[-1] }}",
+							"name": "ca.{{ list[-1] }}"
+						},
+
+						{% for peer in certificates_config_peer %}
+					{% set outer = loop.index0 -%}
+					{% set endOne = loop.last -%}
+					{% for number in range(0, peer.number) %}
+					{% if organization.id == peer.id %}
+
+					"peer{{ loop.index0 }}.{{ peer.domain }}": {
+						"requests": "grpcs://peer{{ loop.index0 }}.{{ peer.domain }}:{{ 7000 + outer*100 + loop.index0 }}",
+							"events": "grpcs://peer{{ loop.index0 }}.{{ peer.domain }}:{{ 17000 + outer*100 + loop.index0 }}",
+							"server-hostname": "peer{{ loop.index0 }}.{{ peer.domain }}",
+							"tls_cacerts": "{{ LOCAL_CRYPTO_PATH }}/crypto-config/peerOrganizations/{{ peer.domain }}/peers/peer{{ loop.index0 }}.{{ peer.domain }}/tls/ca.crt"
+					} {{ '' if loop.last else ',' }}
+
+					{% endif %}
+					{% endfor %}
+					{% endfor %}
+				}{{ '' if loop.index == NUMBER_OF_ORDERER_ORGS else ',' }}
+				{% endif %}
+				{% endfor %}
+			},
+
+			"channel": [
+
+			{% for channel in additional_channels_with_orgs -%}
+
+			{
+
+				"name": "{{ channel.name }}",
+					"deployed": true,
+					"config": "{{ LOCAL_CRYPTO_PATH }}/channel-artifacts/{{ channel.name }}.tx",
+					"organizations": [{% for organization in organizations_config %}{% if 'orderer_organization' != organization.type %}"{{ organization.name|lower }}"{{ '' if loop.index == NUMBER_OF_ORDERER_ORGS else ',' }}{% endif %} {% endfor %}]
+			}{{ '' if loop.last else ',' }}{% endfor %}
+			]
+		},
+
+
+    "chaincodes": [{"id": "{{ caliper_chaincodes.0.id }}", "path": "{{ caliper_chaincodes.0.path }}", "language":"{{ caliper_chaincodes.0.language }}", "version": "v0", "channel": "{{ CALIPER_CHAINCODE_CHANNEL }}"}],
+
+    "endorsement-policy": {
+      "identities": [
+        {
+          "role": {
+            "name": "member",
+            "mspId": "Org1"
+          }
+        },
+        {
+          "role": {
+            "name": "member",
+            "mspId": "Org2"
+          }
+        },
+        {
+          "role": {
+            "name": "admin",
+            "mspId": "Org1"
+          }
+        }
+      ],
+      "policy": { "2-of": [{"signed-by": 0}, {"signed-by": 1}]}
+    },
+
+    "context": {
+      "open": "{{ CALIPER_OPEN_CHANNEL }}",
+      "query": "{{ CALIPER_QUERY_CHANNEL }}"
+    },
+
+		"info" : {
+			"Version": "{{ VERSION }}",
+			"Size": "{{ SIZE }}",
+			"Orderer": "{{ ORDERER }}",
+			"Distribution": "{{ DISTRIBUTION }}",
+			"details": "{{ DETAILS }}"
+		}
+}

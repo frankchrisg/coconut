@@ -1,0 +1,51 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Make sure psycopg2 is installed
+  pip:
+    name: psycopg2
+    state: present
+  run_once: true
+  tags:
+  - bm-set
+- name: Install prerequisites
+  apt:
+    state: "latest"
+    name:
+      - libpq-dev
+      - python-psycopg2
+  run_once: true
+  become: true
+  tags:
+  - bm-set
+- name: Delete all from quorum nonce
+  postgresql_query:
+    db: "{{ DIEM_NONCE_DATABASE }}"
+    port: "{{ DIEM_DATABASE_PORT }}"
+    login_host: "{{ DIEM_DATABASE_HOST }}"
+    login_user: "{{ DIEM_DATABASE_USER }}"
+    login_password: "{{ DIEM_DATABASE_PASSWORD }}"
+    # DELETE FROM diem_nonce
+    query: "{{ DIEM_NONCE_DELETION_QUERY }}"
+  run_once: true
+  tags:
+  - bm-set
+- name: Get mint.key
+  #  shell: '$(which sshpass) -p {{ SSH_PASSWORD_CLI }} ssh -o StrictHostKeyChecking=no {{ SSH_USER_CLI }}@{{ SSH_HOST_CLI }} "cat {{ MINT_KEY_PATH }}/{{ MINT_KEY_FILE }}"'
+  shell: '$(which rsync) -at --rsh="/usr/bin/sshpass {{ SSH_PASSWORD_CLI }} ssh -o StrictHostKeyChecking=no {{ SSH_USER_CLI }}@{{ SSH_HOST_CLI }}" {{ MINT_KEY_PATH }}/{{ MINT_KEY_FILE }} {{ MINT_KEY_LOCATION }}'
+  delegate_to: localhost
+  throttle: 1
+  tags:
+  - bm-set
+- name: Get mint.key output
+  debug:
+    msg: '$(which rsync) -at --rsh="/usr/bin/sshpass {{ SSH_PASSWORD_CLI }} ssh -o StrictHostKeyChecking=no {{ SSH_USER_CLI }}@{{ SSH_HOST_CLI }}" {{ MINT_KEY_PATH }}/{{ MINT_KEY_FILE }} {{ MINT_KEY_LOCATION }}'
+  delegate_to: localhost
+  throttle: 1
+  tags:
+  - bm-set
+#- name: Write mint.key file
+#  local_action:
+#    module: copy
+#    content: "{{ mint_key.stdout }}"
+#    dest: "{{ MINT_KEY_LOCATION }}"

@@ -1,0 +1,21 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Copy keys file
+  copy:
+   src: "{{ GRAPHENE_KEYS_LOCATION }}"
+   dest: "{{ GRAPHENE_KEYS_DESTINATION }}"
+  delegate_to: localhost
+  throttle: 1
+  tags:
+  - bm-set
+- name: Obtain chain id
+  shell: "$(which curl) --data '{\"jsonrpc\": \"2.0\", \"method\": \"get_chain_properties\", \"params\": [], \"id\":1}' http://{{ GRAPHENE_NODE_ADDRESS }}/rpc | jq '.result.chain_id'"
+  register: chain_id
+  tags:
+  - bm-set
+- name: Output chain id
+  debug:
+    msg: "Chain id: {{ chain_id.stdout }} Command: $(which curl) --data '{\"jsonrpc\": \"2.0\", \"method\": \"get_chain_properties\", \"params\": [], \"id\":1}' http://{{ GRAPHENE_NODE_ADDRESS }}/rpc | jq '.result.chain_id'"
+  tags:
+  - bm-set

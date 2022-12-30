@@ -1,0 +1,94 @@
+# This file containing various hosts is used for building
+# a flexible and scalable network of Hyperledger Fabric
+
+[all:vars]
+ansible_port=22
+ansible_python_interpreter=/usr/bin/python3
+ansible_user=parallels
+ansible_ssh_pass=password123
+ansible_become_user=root
+ansible_become_pass=password123
+
+[local]
+localhost ansible_connection=local
+
+[benchmarking-client]
+##10.28.56.33 threads=80 channel=vm5
+#localhost threads=100 channel=vm5 cpu_cores="0,1,2,3,4,5,6,7"
+
+# Only one Blockchain-Explorer instance should be started on a server
+[blockchain-explorer]
+#localhost databaseip=192.168.2.111
+
+[caliper]
+# Set only one master in case of distributed execution through Apache ZooKeeper.
+#localhost master=true
+#10.28.56.33
+#10.28.56.34
+#10.28.56.35
+#10.28.56.36
+#10.28.56.37
+
+# Currently only one server is expected to serve statistics
+[statistics]
+192.168.178.22 serverip=192.168.178.22
+
+# Currently only one server is expected to serve statsd
+[statsd]
+192.168.178.22
+
+[peer]
+peer0.peerone.com serverip=65.108.129.158 collectstats=true
+peer1.peerone.com serverip=65.108.129.159 collectstats=true
+peer2.peerone.com serverip=65.108.129.160 collectstats=true
+peer3.peerone.com serverip=95.217.47.47 collectstats=true
+peer4.peerone.com serverip=135.181.138.116 collectstats=true
+peer5.peerone.com serverip=135.181.56.219 collectstats=true
+peer6.peerone.com serverip=135.181.60.247 collectstats=true
+peer7.peerone.com serverip=65.109.50.100 collectstats=true
+peer8.peerone.com serverip=65.108.129.158 collectstats=true
+peer9.peerone.com serverip=65.108.129.159 collectstats=true
+peer10.peerone.com serverip=65.108.129.160 collectstats=true
+peer11.peerone.com serverip=95.217.47.47 collectstats=true
+peer12.peerone.com serverip=135.181.138.116 collectstats=true
+peer13.peerone.com serverip=135.181.56.219 collectstats=true
+peer14.peerone.com serverip=135.181.60.247 collectstats=true
+peer15.peerone.com serverip=65.109.50.100 collectstats=true
+
+# Variables per group can be used as
+#[peer:vars]
+#ansible_port=2323
+
+[orderer]
+orderer0.ordererone.com serverip=65.108.129.158 consenter=true
+orderer1.ordererone.com serverip=65.108.129.159 consenter=true
+orderer2.ordererone.com serverip=65.108.129.160 consenter=true
+
+[zookeeper]
+zookeeper0.zookeeper.com serverip=65.108.129.158
+zookeeper1.zookeeper.com serverip=65.108.129.159
+zookeeper2.zookeeper.com serverip=65.108.129.160
+
+[kafka]
+kafka0.kafka.com serverip=65.108.129.158
+kafka1.kafka.com serverip=65.108.129.159
+kafka2.kafka.com serverip=65.108.129.160
+
+[ca]
+ca.peerone.com serverip=65.108.129.158
+
+[couchdb:children]
+peer
+
+[realservers]
+65.108.129.158 telegraf=true
+65.108.129.159 telegraf=true
+65.108.129.160 telegraf=true
+95.217.47.47 telegraf=true
+135.181.138.116 telegraf=true
+135.181.56.219 telegraf=true
+135.181.60.247 telegraf=true
+65.109.50.100 telegraf=true
+192.168.178.22 executor_main=true
+#10.28.55.241 # Xeon Silver 4116
+#10.28.56.35 # Xeon X5650

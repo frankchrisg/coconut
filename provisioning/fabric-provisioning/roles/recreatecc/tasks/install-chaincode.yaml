@@ -1,0 +1,29 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- import_tasks: inner-install.yml
+  loop: "{{ certificates_config_peer }}"
+  loop_control:
+    loop_var: item
+    index_var: outer_index
+- name: Instantiate Chaincode
+  shell: >-
+    sleep {{ DEFAULT_SLEEP_TIME }} && echo CORE_PEER_LOCALMSPID={{ PREFERRED_CORE_PEER_LOCALMSPID }}
+    CORE_PEER_ADDRESS={{ PREFERRED_CORE_PEER_ADDRESS }}
+    CORE_PEER_MSPCONFIGPATH={{ PREFERRED_CORE_PEER_MSPCONFIGPATH }}
+    CORE_PEER_TLS_ROOTCERT_FILE={{ CORE_PEER_TLS_ROOTCERT_FILE }} "peer
+    chaincode upgrade {{ x_item.1.policy  | replace ('!','\"') if x_item.1.policy is defined else ''
+    }} -l {{ CHAINCODE_LANGUAGE }} -o {{
+    PREFERRED_ORDERER_WITH_PORT_TO_CREATE_CHANNEL }} --tls --cafile
+    /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/{{
+    PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}/orderers/{{
+    PREFERRED_ORDERER_TO_CREATE_CHANNEL }}/msp/tlscacerts/tlsca.{{
+    PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}-cert.pem -n {{ 
+    x_item.1.name.split('/')[0] }} -v {{ CHAINCODE_VERSION }} -c '{{ x_item.1.args | replace ('!','\"') }}' -C {{
+    x_item[0] }}" | docker exec -i {{ PREFERRED_CLI_CHANNEL_CREATION }}
+    /bin/bash -
+  loop: "{{ additional_channels|flatten(levels=1) | product(chaincodes)|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: xmy_idx
+  when: "x_item[0] not in channels_to_exclude_from_chaincode"

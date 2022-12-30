@@ -1,0 +1,230 @@
+- meta: end_play
+  when: CONSENSUS_NAME != 'istanbulbft'
+- name: Create artifacts for istanbulbft (number of non-validator nodes {{ sumOfAdditionalNonValidatorNodes.msg | int }})
+  shell: 'echo "/istanbulbft/istanbul setup --num {{ sumOfAdditionalNonValidatorNodes.msg | int }} --nodes --verbose --quorum --save > istanbul_output_non_validator.txt && cat istanbul_output_non_validator.txt | grep Nodekey |  cut -d \\\" -f 4 " | docker exec -i {{ inventory_hostname }} /bin/bash -'
+  when: hostvars[inventory_hostname]['istanbulinitiator'] is defined and hostvars[inventory_hostname]['istanbulinitiator'] | bool and CONSENSUS_NAME == 'istanbulbft'
+  register: nodekeys
+  tags:
+  - bm-set
+- name: Handle nodekeys (ibft)
+  block:
+    - name: Put nodekeys to local file
+      local_action: lineinfile path="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/local_nodekeys.txt" line={{ item }} insertbefore="EOF" create="yes"
+      loop: "{{ nodekeys.stdout_lines | default([]) }}"
+      when: CONSENSUS_NAME == 'istanbulbft'
+    - name: Ensure local_nodekeys.txt for istanbulbft exists
+      copy:
+        content: ""
+        dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/local_nodekeys.txt"
+        force: no
+      delegate_to: localhost
+      when: CONSENSUS_NAME == 'istanbulbft'
+    - name: Put nodekeys to local file (backup)
+      local_action: lineinfile path="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/local_nodekeys_backup.txt" line={{ item }} insertbefore="EOF" create="yes"
+      loop: "{{ nodekeys.stdout_lines | default([]) }}"
+      when: CONSENSUS_NAME == 'istanbulbft'
+  throttle: 1
+  tags:
+  - bm-set
+- name: Create directories for additional non-validator nodes
+  shell: "echo 'mkdir -p /nodes/non-validator-node-{{ item }}/data/geth' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  loop: "{% if additional_nodes_per_container[groups['node'].index(inventory_hostname)].additional_non_validators | int is defined and additional_nodes_per_container[groups['node'].index(inventory_hostname)].additional_non_validators | int > 0 %}{{ range(0, additional_nodes_per_container[groups['node'].index(inventory_hostname)].additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+
+- name: Copy created static-nodes file from container to host
+  shell: "docker cp {{ inventory_hostname }}:/static-nodes.json {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes-non-validator.json"
+  when: hostvars[inventory_hostname]['istanbulinitiator'] is defined and hostvars[inventory_hostname]['istanbulinitiator'] | bool and CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+
+- name: Copy static-nodes file to local
+  fetch:
+    src: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes-non-validator.json"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes-non-validator.json"
+    flat: yes
+  when: hostvars[inventory_hostname]['istanbulinitiator'] is defined and hostvars[inventory_hostname]['istanbulinitiator'] | bool and CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+
+- name: Handle enodes
+  block:
+    - name: Replace enodes in static-nodes file (non-validator node)
+      local_action: shell /bin/sed -i '0,/0.0.0.0:30303/s/0.0.0.0:30303/{{ hostvars[inventory_hostname]['serverip'] }}:{{ P2P_START_PORT + groups['node'].index(inventory_hostname) * 100 + my_idx + additional_nodes_per_container[groups['node'].index(inventory_hostname)].number | int }}/' {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes-non-validator.json warn="false"
+      loop: "{% if additional_nodes_per_container[groups['node'].index(inventory_hostname)].additional_non_validators | int is defined and additional_nodes_per_container[groups['node'].index(inventory_hostname)].additional_non_validators | int > 0 %}{{ range(0, additional_nodes_per_container[groups['node'].index(inventory_hostname)].additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+      loop_control:
+        loop_var: item
+        index_var: my_idx
+      when: CONSENSUS_NAME == 'istanbulbft'
+
+    - name: Output enodes
+      debug:
+        msg: "{{ item }}"
+      with_lines: "{% if CONSENSUS_NAME == \"raft\" %}echo \"\"{% else %}cat {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes-non-validator.json{% endif %}"
+      register: enodesNonValidators
+      when: CONSENSUS_NAME == 'istanbulbft'
+
+    - name: Replace last comma in static-nodes file (non-validator)
+      local_action: replace path="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes-non-validator.json" replace='\n]' regexp=',\n]'
+      when: CONSENSUS_NAME == 'istanbulbft'
+
+    - name: Put lines from static-nodes file (non-validator) to the general static-nodes file
+      local_action: lineinfile path="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes.json" insertbefore=']' line="{{ item.item | replace ('[', '') | replace (']', '') }}"
+      loop: "{{ enodesNonValidators.results }}"
+      when: CONSENSUS_NAME == 'istanbulbft'
+    - name: Delete added keys from static-nodes
+      local_action: lineinfile dest="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes.json" state=absent regexp='0.0.0.0:30303'
+      when: CONSENSUS_NAME == 'istanbulbft'
+    - name: Delete added keys from static-nodes (non-validator)
+      local_action: lineinfile dest="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes-non-validator.json" state=absent regexp='^((?!0\.0\.0\.0:30303).)*$'
+      when: CONSENSUS_NAME == 'istanbulbft'
+
+  throttle: 1
+  tags:
+  - bm-set
+- name: Copy complete static-nodes file and genesis file to remote host
+  copy:
+    src: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}"
+  loop: "{{ ['genesis.json', 'static-nodes.json'] | flatten(levels=1 )}}"
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Copy genesis file to container (non-validator)
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/genesis.json {{ inventory_hostname }}:/nodes/non-validator-node-{{ item }}/genesis.json"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Copy static-nodes file to container (validator)
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes.json {{ inventory_hostname }}:/nodes/node-{{ item }}/static-nodes.json"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Copy static-nodes file to container (non-validator)
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes.json {{ inventory_hostname }}:/nodes/non-validator-node-{{ item }}/static-nodes.json"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Handle local_nodekeys
+  block:
+    - name: Create local_nodekeys.txt
+      file:
+        path: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/local_nodekeys.txt"
+        state: touch
+      when: CONSENSUS_NAME == 'raft'
+    - name: Create local_nodekeys.txt (local)
+      local_action: file path="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/local_nodekeys.txt" state="touch"
+      when: CONSENSUS_NAME == 'raft'
+  throttle: 1
+  tags:
+  - bm-set
+- name: Output local nodekeys
+  debug:
+    msg: "{{ item }}"
+  with_file:
+    - "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/local_nodekeys.txt"
+  register: localNodekeys
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Output local nodekeys (formatted)
+  debug:
+    msg: "{{ localNodekeys.results[0].item.split('\n') }}" 
+  register: localNodekeys_split
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Output local nodekeys per line
+  debug:
+    msg: '{{ localNodekeys_split.msg[item | int] }}'
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Handle nodekeys (ibft 2)
+  block:
+    - name: Write nodekey to container files per node
+      shell: 'echo "echo \"{{ localNodekeys_split.msg[item | int] }}\" >> /nodes/non-validator-node-{{ item }}/data/geth/nodekey && echo \"{{ localNodekeys_split.msg[item | int] }}\" >> /nodes/non-validator-node-{{ item }}/nodekey" | docker exec -i {{ inventory_hostname }} /bin/bash -'
+      loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+      loop_control:
+        loop_var: item
+        index_var: my_idx
+      when: CONSENSUS_NAME == 'istanbulbft'
+    - name: Delete local nodekeys
+      local_action: lineinfile dest="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/local_nodekeys.txt" state=absent regexp="{{ localNodekeys_split.msg[item | int] }}"
+      loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+      loop_control:
+        loop_var: item
+        index_var: my_idx
+      when: CONSENSUS_NAME == 'istanbulbft'
+  throttle: 1
+  tags:
+  - bm-set
+- name: Create new accounts (non-validator)
+  shell: "echo '{{ BUILD_PATH }}/geth --datadir /nodes/non-validator-node-{{ item }} account new  --password passwordfile.txt' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Initialize node (non-validator)
+  shell: "echo '{{ BUILD_PATH }}/geth --datadir /nodes/non-validator-node-{{ item }} init /nodes/non-validator-node-{{ item }}/genesis.json' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Create start script (non-validator)
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/nodeStartScript-istanbulbft-non-validator.j2"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname}}-non-validator-node-{{ item }}-{{ CONSENSUS_NAME }}-StartScript.sh"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Change file permissions
+  file:
+    path: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname}}-non-validator-node-{{ item }}-{{ CONSENSUS_NAME }}-StartScript.sh"
+    mode: 0755
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Copy start script to container (non-validator)
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname}}-non-validator-node-{{ item }}-{{ CONSENSUS_NAME }}-StartScript.sh {{ inventory_hostname }}:/nodes/non-validator-node-{{ item }}/non-validator-node-{{ item }}-{{ CONSENSUS_NAME }}-StartScript.sh"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set

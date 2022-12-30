@@ -1,0 +1,18 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Check if Hyperledger Fabric version is greater than 1.2
+  fail: msg="Please use Hyperledger Fabric 1.3 and newer to gather statistics."
+  when: (IMAGE_TAG.split(".")[0] + "." + IMAGE_TAG.split(".")[1])|float < 1.3
+- name: Gather peer stats
+  shell: "{{ SCRIPTS_PATH }}/prepareStatsForPeer.sh {{ inventory_hostname }} {{ CHANNEL_NAME }} {{ CENTRAL_LOG_PATH }}"
+  when: hostvars[inventory_hostname]['collectstats'] is defined and hostvars[inventory_hostname]['collectstats'] | bool
+  register: output
+- name: Output of peer statistics shell script
+  debug:
+    msg: "Result: {{ output.stdout_lines }}"
+  when: output.stdout_lines is defined
+- name: "Output error"
+  debug:
+    msg: "{{ output.stderr_lines }}"
+  when: output.stderr_lines is defined

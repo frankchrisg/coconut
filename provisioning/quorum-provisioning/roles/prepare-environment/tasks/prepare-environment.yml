@@ -1,0 +1,203 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+#- name: "Set gvm permissions {{ lookup('env', 'GVM_ROOT') }}/scripts/gvm"
+#  file:
+#    path: "{{ lookup('env', 'GVM_ROOT') }}/scripts/gvm"
+#    mode: '0755'
+#- name: "Install and use Go version {{ GO_VERSION }}"
+#  shell: "source {{ lookup('env', 'GVM_ROOT') }}/scripts/gvm && $(which gvm) install {{ GO_VERSION }}"
+#  args:
+#    executable: /bin/bash
+#- name: Check if {{ go_version }} is the default go version
+#  shell:  "source {{ lookup('env', 'GVM_ROOT') }}/scripts/gvm && gvm use {{ GO_VERSION }}"
+#  args:
+#    executable: /bin/bash
+- name: Populate /etc/environment for go
+  lineinfile:
+    dest: "/etc/environment"
+    state: present
+    regexp: "^{{ item.key }}="
+    line: "{{ item.key }}={{ item.value}}"
+  loop: "{{ ENVIRONMENT }}"
+  become: true
+  when: GO_FORCE_DOWNLOAD
+  tags:
+  - bm-set
+- name: Create gopath directory
+  file:
+    path: "{{ ENVIRONMENT[0].value }}"
+    state: directory
+    mode: '0755'
+  when: GO_FORCE_DOWNLOAD
+  tags:
+  - bm-set
+- name: Remove symlink
+  file:
+    path: "/usr/bin/go"
+    state: absent
+  when: GO_FORCE_DOWNLOAD
+  become: true
+  tags:
+  - bm-set
+- name: Create a symlink
+  file:
+    src: /usr/local/go/bin/go
+    dest: /usr/bin/go
+    owner: root
+    group: root
+    state: link
+  when: GO_FORCE_DOWNLOAD
+  become: true
+  tags:
+  - bm-set
+- name: Reload /etc/environment
+  shell: "set -a; source /etc/environment; set +a;"
+  tags:
+  - bm-set
+
+- name: Check quorum exists
+  stat:
+    path: "{{ LOCAL_QUORUM_PATH }}"
+  register: quorum_exists
+  tags:
+  - bm-set
+- name: Check instanbul-tools exist
+  stat:
+    path: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH.split('/')[0:-1] | join('/') }}/istanbulbft"
+  register: istanbul_exists
+  tags:
+  - bm-set
+
+- name: Clone quorum
+  git:
+    repo: "{{ QUORUM_URL }}"
+    dest: "{{ LOCAL_QUORUM_PATH }}"
+    force: "{{ QUORUM_FORCE_CLONE }}"
+    version: "{{ QUORUM_VERSION }}"
+  throttle: 5
+  when: not quorum_exists.stat.exists or QUORUM_FORCE_CLONE
+  tags:
+  - bm-set
+- name: Run make install
+  make:
+    chdir: "{{ LOCAL_QUORUM_PATH }}"
+    target: all
+  tags:
+  - bm-set
+- name: Clone Quorum istanbul-tools
+  git:
+    repo: "{{ ISTANBUL_URL }}"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH.split('/')[0:-1] | join('/') }}/istanbulbft"
+    force: "{{ ISTANBULBFT_FORCE_CLONE }}"
+    version: "{{ ISTANBUL_VERSION }}"
+  throttle: 5
+  when: CONSENSUS_NAME == 'istanbulbft' and (not istanbul_exists.stat.exists or ISTANBULBFT_FORCE_CLONE)
+  tags:
+  - bm-set
+- name: Run make istanbul
+  make:
+    chdir: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH.split('/')[0:-1] | join('/') }}/istanbulbft"
+    target: istanbul
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Copy the docker compose files
+  copy:
+    src: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}_compose.yaml"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}_compose.yaml"
+  tags:
+  - bm-set
+- name: Find files on remote machine (Nodes)
+  find:
+    paths: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}"
+    patterns: "{{ inventory_hostname }}*.yaml"
+  register: output
+  tags:
+  - bm-set
+- name: Create password file to create accounts
+  copy:
+    content: "{{ ACCOUNT_PASSWORD }}"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/passwordfile.txt"
+  tags:
+  - bm-set
+- name: Download tessera
+  get_url:
+    url: "{{ TESSERA_URL }}"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH.split('/')[0:-1] | join('/') }}/tessera.jar"
+    force: "{{ TESSERA_FORCE_CLONE }}"
+  when: ENABLE_TESSERA
+  tags:
+  - bm-set
+- name: Download constellation
+  get_url:
+    url: "{{ CONSTELLATION_URL }}"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH.split('/')[0:-1] | join('/') }}/constellation.tar.xz"
+    force: "{{ CONSTELLATION_FORCE_DOWNLOAD }}"
+  when: ENABLE_CONSTELLATION
+  tags:
+  - bm-set
+- name: Extract constellation
+  unarchive:
+    src: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH.split('/')[0:-1] | join('/') }}/constellation.tar.xz"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}"
+    remote_src: yes
+  when: ENABLE_CONSTELLATION
+  tags:
+  - bm-set
+- name: Check if constellation exists
+  stat:
+    path: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/constellation"
+  register: constellation
+  tags:
+  - bm-set
+- name: Move constellation
+  command: mv "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{CONSTELLATION_URL.split("/")[-1].split('.')[0:-2] | join('.')}}" "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/constellation"
+  when: ENABLE_CONSTELLATION and constellation.stat.exists == true
+  tags:
+  - bm-set
+- name: Set getkeys command
+  set_fact:
+    keys_command:
+      "#!/bin/bash\nawk -F '\"' '{ print $4 }' <<< ls ./nodes/{{ KEYS_TO_USE }}"
+  tags:
+  - bm-set
+- name: Output getkeys command
+  debug:
+    msg: "{{ keys_command }} getkeys command"
+  tags:
+  - bm-set
+- name: Create getkeys command to execute in container
+  copy: 
+    content: "{{ keys_command }}"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/getKeys.sh"
+    mode: "0755"
+  tags:
+  - bm-set
+- name: Create telegraf.conf
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/telegraf-container.j2"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}_telegraf.conf"
+  tags:
+  - bm-set
+
+- name: Stop node containers
+  docker_compose:
+    project_src: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}"
+    files: "{{ item.path | basename }}"
+    remove_volumes: yes
+    state: absent
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-rem
+
+- name: Run node containers
+  docker_compose:
+    project_src: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}"
+    files: "{{ item.path | basename }}"
+    recreate: always
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-run

@@ -1,0 +1,64 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Delete temporary directory for validator configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/validator_configs state=absent"
+  tags:
+  - bm-set
+- name: Create temporary directory for validator configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/validator_configs state=directory"
+  tags:
+  - bm-set
+- name: Delete temporary directory for rest configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/rest_configs state=absent"
+  tags:
+  - bm-set
+- name: Create temporary directory for rest configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/rest_configs state=directory"
+  tags:
+  - bm-set
+- name: Delete temporary directory for cli configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/cli_configs state=absent"
+  tags:
+  - bm-set
+- name: Create temporary directory for cli configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/cli_configs state=directory"
+  tags:
+  - bm-set
+- name: Delete temporary directory for log configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/log_configs state=absent"
+  tags:
+  - bm-set
+- name: Create temporary directory for log configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/log_configs state=directory"
+  tags:
+  - bm-set
+- name: Delete temporary directory for additional configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/additional_configs state=absent"
+  tags:
+  - bm-set
+- name: Create temporary directory for additional configuration files
+  file: "path={{ MAIN_CONFIG_PATH }}/additional_configs state=directory"
+  tags:
+  - bm-set
+- name: Delete temporary file for public keys
+  file: "path={{ MAIN_CONFIG_PATH }}/public_keys.txt state=absent"
+  tags:
+  - bm-set
+- name: Delete key file
+  file: "path={{ MAIN_CONFIG_PATH }}/zmqkeys.txt state=absent"
+  tags:
+  - bm-set
+- name: Delete validators directory
+  file:
+    state: absent
+    path: "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}"
+  become: true
+  tags:
+  - bm-set
+- name: Create validators directory
+  file:
+    state: directory
+    path: "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}"
+  tags:
+  - bm-set

@@ -1,0 +1,59 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Get container status
+  shell: docker inspect --format={{ '{{.State.Running}}' }} elasticsearch
+  register: status
+  failed_when: status.rc != 1 and status.rc != 0
+  when: ENABLE_ELASTICSEARCH
+- name: Pull Elasticsearch image
+  docker_image:
+    name: "elasticsearch"
+    tag: "{{ ELASTICSEARCH_IMAGE_VERSION }}"
+  when: status is defined and status.stdout is defined and status.stdout != "true" and ENABLE_ELASTICSEARCH
+- name: Get container status
+  shell: docker inspect --format={{ '{{.State.Running}}' }} kibana
+  register: status
+  failed_when: status.rc != 1 and status.rc != 0
+  when: ENABLE_ELASTICSEARCH
+- name: Pull Kibana image
+  docker_image:
+    name: "kibana"
+    tag: "{{ KIBANA_IMAGE_VERSION }}"
+  when: status is defined and status.stdout is defined and status.stdout != "true" and ENABLE_ELASTICSEARCH
+- name: Create compose file for kibana and elasticsearch
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/elasticsearch+kibana_compose.j2"
+    dest: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/elasticsearch+kibana_compose.yaml"
+  when: ENABLE_ELASTICSEARCH
+#- name: Find files on remote machine (Elasticsearch + Kibana)
+#  find:
+#    paths: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/genesis/elasticsearch+kibana_compose.yaml"
+#  register: output
+
+- name: Stop elasticsearch and kibana containers
+  docker_compose:
+    project_src: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}"
+    files: "elasticsearch+kibana_compose.yaml"
+  #  remove_volumes: yes
+    state: absent
+  throttle: 1
+  when: ENABLE_ELASTICSEARCH
+
+- name: Run elasticsearch and kibana containers
+#  docker_service:
+#    project_src: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}"
+#    files: "elasticsearch+kibana_compose.yaml"
+  docker_compose:
+    project_src: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}"
+    files: "elasticsearch+kibana_compose.yaml"
+    recreate: always
+  throttle: 1
+  when: ENABLE_ELASTICSEARCH
+
+- name: Wait for container
+  wait_for:
+    port: "{{ item }}"
+    host: "{{inventory_hostname}}"
+  loop: "{{ [9200, 9300, 5601] | flatten(levels=1 )}}"
+  when: ENABLE_ELASTICSEARCH

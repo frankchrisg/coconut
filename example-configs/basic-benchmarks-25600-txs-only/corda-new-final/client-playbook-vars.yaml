@@ -1,0 +1,65 @@
+CLIENT_PATH: "{{ MAIN_CONFIG_PATH }}"
+CLIENT_JAR: "ABPES-1.0-SNAPSHOT-jar-with-dependencies.jar"
+CLIENT_PARAMS: "-Xmx12G -javaagent:quasar-core-0.8.0.jar=mb --module-path /usr/share/openjfx/lib --add-modules=javafx.base" 
+# -Dco.paralleluniverse.fibers.verifyInstrumentation=true
+
+OPEN_JDK: "openjdk-11-jdk"
+OPEN_JDK_FULL: "java-1.11.0-openjdk-amd64"
+JAVA_PATH: "/usr/lib/jvm/{{ OPEN_JDK_FULL }}/bin/java"
+
+SLEEP_TIME: "{{ 10 | random(start=1, step=1) }}"
+#SLEEP_TIME_COMMAND: "$((RANDOM % {{ SLEEP_TIME }}))"
+SLEEP_TIME_COMMAND: "{{ SLEEP_TIME }}"
+
+BUILD_JVM_IMAGE: true
+REBUILD_JVM_IMAGE_IF_EXISTS: "no"
+RUN_IN_JVM_CONTAINER: true
+MAX_CPU_CORES: "0-15"
+#"0,1,2"
+#0-15
+MAX_MEMORY: 0
+
+# quorum # fabric # graphene # none
+BASIC_SYSTEM: none
+
+SSH_USER_CLI: root
+SSH_PASSWORD_CLI: password123
+SSH_HOST_CLI: 185.132.177.76
+CLI_NAME: cli.peerone.com
+
+QUORUM_KEYS_LOCATION: "/home/parallels/FINAL_graphene_corda_latest_xxx/quorum-provisioning/templates/keys.txt"
+QUORUM_KEYS_DESTINATION: "{{ MAIN_CONFIG_PATH }}/additional_configs/quorumKeys.txt"
+
+QUORUM_CONTRACT_FILE_LOCATION: "/home/parallels/FINAL_graphene_corda_latest_xxx/quorum-related/quorum-nodes/contract_addresses.txt"
+QUORUM_CONTRACT_FILE_DESTINATION: "{{ MAIN_CONFIG_PATH }}/additional_configs/quorumContracts.txt"
+
+GRAPHENE_KEYS_LOCATION: "/home/parallels/FINAL_graphene_corda_latest_xxx/graphene-files/initial-accounts-keys_and_addresses.txt"
+GRAPHENE_KEYS_DESTINATION: "{{ MAIN_CONFIG_PATH }}/additional_configs/witness-file"
+
+FABRIC_CA_LOCATION: "{{ MAIN_CONFIG_PATH }}/additional_configs/ca.pem"
+FABRIC_ORDERER_CA_LOCATION: "{{ MAIN_CONFIG_PATH }}/additional_configs/orderer-ca.pem"
+
+GRAPHENE_NODE_ADDRESS: "185.132.177.76:11000"
+
+RUN_ID: "-runid"
+
+JAR_PATH: "{{ MAIN_CONFIG_PATH }}/client_skel"
+JAR_PATH_JARS: "{{ JAR_PATH }}/jars"
+JARS:
+  - ABPES-1.0-SNAPSHOT-jar-with-dependencies.jar
+  - quasar-core-0.8.0.jar
+
+FORCE_COPY_JARS: true
+
+BACKUP_PATH: "{{ MAIN_CONFIG_PATH }}/backups"
+
+parameters:
+#  "quorumConfiguration.properties":
+#    - ADDRESS_OR_WALLET_FILE=: "{{ CLIENT_PATH }}/{{inventory_hostname}}/quorumKeys.txt"
+  "generalConfiguration.properties":
+    - HOST_ID=: "{{ inventory_hostname }}"
+  "grapheneConfiguration.properties":
+    - CHAIN_ID=: "{{ chain_id.stdout | default('not_defined') }}"
+  "fabricConfiguration.properties":
+    - caPem=: "./ca.pem" 
+    - ORDERER_CA_PEM=: "./ordererCa.pem"

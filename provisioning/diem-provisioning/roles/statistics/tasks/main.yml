@@ -1,0 +1,50 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Create Prometheus directory to mount if it does not exist
+  file:
+    path: /var/lib/prometheus-data
+    state: directory
+    mode: "0755"
+  become: true
+- name: Create prometheus configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/prometheus-configuration.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/prometheus-configuration.yaml"
+- name: Create prometheus compose file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/prometheus-compose.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/prometheus-compose.yaml"
+- name: Run prometheus container
+  docker_compose:
+    project_src: "{{ MAIN_CONFIG_PATH }}/"
+    files: "prometheus-compose.yaml"
+  retries: "{{ RETRIES_DOCKER }}"
+  delay: "{{ DELAY_DOCKER }}"
+- name: Add tzdata
+  shell: echo "apk add tzdata" | docker exec --interactive {{ item }} /bin/sh
+  loop:
+    - monitoring_prometheus
+    - monitoring_node_exporter
+    - monitoring_cadvisor
+  ignore_errors: yes
+- name: Copy timezone
+  shell: echo "cp /usr/share/zoneinfo/Europe/Berlin /etc/localtime" | docker exec --interactive {{ item }} /bin/sh
+  loop:
+    - monitoring_prometheus
+    - monitoring_node_exporter
+    - monitoring_cadvisor
+  ignore_errors: yes
+- name: Set timezone
+  shell: echo "echo 'Europe/Berlin' > /etc/timezone" | docker exec --interactive {{ item }} /bin/sh
+  loop:
+    - monitoring_prometheus
+    - monitoring_node_exporter
+    - monitoring_cadvisor
+  ignore_errors: yes
+- name: Restart container
+  shell: docker restart {{ item }}
+  loop:
+    - monitoring_prometheus
+    - monitoring_node_exporter
+    - monitoring_cadvisor

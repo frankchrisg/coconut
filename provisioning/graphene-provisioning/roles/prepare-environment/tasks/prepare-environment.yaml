@@ -1,0 +1,144 @@
+- name: Create testnet directory
+  file:
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}"
+    state: directory
+    mode: '0755'
+  tags:
+  - bm-set
+- name: Create testnet genesis directory
+  file:
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/genesis"
+    state: directory
+  tags:
+  - bm-set
+- name: Create testnet data directory
+  file:
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/datadir"
+    state: directory
+  tags:
+  - bm-set
+
+# Must be divisible by block_interval
+#- name: Get timestamp for genesis
+#  shell: "date +%Y-%m-%dT%H:%M:00 -d \"-2 hours\""
+#  register: timestampgenesis
+
+- name: Create genesis file from template
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/genesis-dev.j2"
+    dest: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/genesis/genesis.json"
+  tags:
+  - bm-set
+- name: Copy binaries
+  copy:
+    src: "{{ GRAPHENE_PATH }}/programs/{{ item }}"
+    dest: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/"
+    mode: '0755'
+    remote_src: "{% if COPY_BINARIES %}no{% else %}yes{% endif %}"
+  loop: "{{ ['cli_wallet/cli_wallet', 'witness_node/witness_node'] | flatten(levels=1 )}}"
+  throttle: 1
+  tags:
+  - bm-set
+- name: Register public keys
+  local_action: "shell head -n {% if hostvars[inventory_hostname]['witnesses'] is defined %}{{ hostvars[inventory_hostname]['witnesses'] }}{% else %}1{% endif %} {{ PRIVATE_KEY_FILE }}_copy | awk -F ':' '{ print $3 }'  | awk -F ',' '{ print $1 }' | sed \"s/\\\"//g\""
+  register: public_keys_config
+  throttle: 1
+  tags:
+  - bm-set
+- name: Register private keys
+  local_action: "shell head -n {% if hostvars[inventory_hostname]['witnesses'] is defined %}{{ hostvars[inventory_hostname]['witnesses'] }}{% else %}1{% endif %} {{ PRIVATE_KEY_FILE }}_copy | awk -F ':' '{ print $2 }'  | awk -F ',' '{ print $1 }' | sed \"s/\\\"//g\""
+  register: private_keys_config
+  throttle: 1
+  tags:
+  - bm-set
+- name: Combine list of public keys with private keys
+  local_action: debug
+  args:
+    msg: "{{ public_keys_config.stdout_lines | zip(private_keys_config.stdout_lines) | list }}"
+  register: zipped_keys
+  throttle: 1
+  tags:
+  - bm-set
+- name: Register total lines of keys
+  local_action: "shell wc -l < {{ PRIVATE_KEY_FILE }}"
+  register: lines
+  throttle: 1
+  tags:
+  - bm-set
+- name: Register remaining lines of keys
+  local_action: "shell wc -l < {{ PRIVATE_KEY_FILE }}_copy"
+  register: remaining_lines
+  throttle: 1
+  tags:
+  - bm-set
+- name: Output lines of keys
+  local_action: debug
+  args:
+    msg: "Total lines: {{ lines.stdout }} Remaining lines: {{ remaining_lines.stdout }}"
+  throttle: 1
+  tags:
+  - bm-set
+
+- name: Create node configuration
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/config-ini.j2"
+    dest: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/datadir/config.ini"
+  throttle: 1
+  tags:
+  - bm-set
+- name: Register node ip
+  shell: "grep -Eo \"rpc-endpoint = (([0-9]|[0-9]{2}|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[0-9]{2}|1[0-9]{2}|2[0-4][0-9]|25[0-5]):[0-9]{5}\" {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/datadir/config.ini | awk 'BEGIN { FS=\"[ ]\" } ; { print $3 }'"
+  register: node_ip_and_port
+  tags:
+  - bm-set
+- name: Register node port
+  shell: "grep -Eo \"rpc-endpoint = .*?:[0-9]{5}\" {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/datadir/config.ini | awk '{split($0,a,\":\"); print a[2]}'"
+  register: node_port
+  tags:
+  - bm-set
+- name: Debug output ip and port
+  debug:
+    msg: "{{ node_ip_and_port }} | IP used: {% if node_ip_and_port.stdout | trim | regex_search(\"^0.0.0.0\") %}{{ hostvars[inventory_hostname][\"serverip\"] }}{% else %}{{ node_ip_and_port.stdout | trim }}{% endif %}"
+  tags:
+  - bm-set
+
+- name: Add node ip to associated key
+  lineinfile:
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item[1] }}"
+    regexp: "(\"private_key\":\".*?\",\"public_key\":\".*?\",\"address\":\".*?\"$)"
+    firstmatch: yes
+    backrefs: yes
+    state: present
+    line: '\1 {% if node_ip_and_port.stdout | trim | regex_search("^0.0.0.0") %}{{ hostvars[inventory_hostname]["serverip"] }}:{{ node_port.stdout }}{% else %}{{ node_ip_and_port.stdout | trim }}{% endif %}'
+  loop: "{% if hostvars[inventory_hostname]['number_of_client_accounts'] is defined %}{{ range(0, hostvars[inventory_hostname]['number_of_client_accounts'] | int) | product([\"initial-accounts-keys_and_addresses.txt\", \"initial-witness-keys_and_addresses.txt\", \"initial-committee-keys_and_addresses.txt\"]) | list }}{% endif %}"
+  delegate_to: localhost
+  throttle: 1
+  tags:
+  - bm-set
+
+#- name: Copy modified files to local
+#  debug:
+#    msg: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }} {{ MAIN_CONFIG_PATH }}/{{ item }}"
+#  loop: "{{ ['initial-accounts-keys_and_addresses.txt', 'initial-witness-keys_and_addresses.txt', 'initial-committee-keys_and_addresses.txt'] | flatten(levels=1 )}}"
+#  delegate_to: localhost
+
+#- name: Copy modified files to local
+#  fetch:
+#    src: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}"
+#    dest: "{{ MAIN_CONFIG_PATH }}/{{ item }}"
+#    flat: yes
+#  loop: "{{ ['initial-accounts-keys_and_addresses.txt', 'initial-witness-keys_and_addresses.txt', 'initial-committee-keys_and_addresses.txt'] | flatten(levels=1 )}}"
+
+- name: Delete keys in {{ PRIVATE_KEY_FILE }}_copy
+  local_action: "shell /bin/sed -i '0,/^\"private_key.*\"/s/^\"private_key.*\"//' {{ PRIVATE_KEY_FILE }}_copy && /bin/sed -i ':a;N;$!ba;s/\\n//' {{ PRIVATE_KEY_FILE }}_copy warn=false"
+  loop: "{% if hostvars[inventory_hostname]['witnesses'] is defined %}{{ range(0, hostvars[inventory_hostname]['witnesses'] | int) | list }}{% else %}{{ range(0, 1) | list }}{% endif %}"
+  throttle: 1
+  tags:
+  - bm-set
+- name: Create logging configuration
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/logging-ini.j2"
+    dest: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/datadir/logging.ini"
+  tags:
+  - bm-set
+

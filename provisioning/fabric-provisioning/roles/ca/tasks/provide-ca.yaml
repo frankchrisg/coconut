@@ -1,0 +1,78 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Create CA configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/ca.j2"
+    dest: >-
+      {{ MAIN_CONFIG_PATH }}/ca_configs/ca.{{ item[0][0].1.path.split('/')[-1]
+      }}.yaml
+  loop: >-
+    {{
+    items.results|map(attribute='files')|sum(start=[])|map(attribute='path')|list|
+    zip(dir.files)|list | product(certificates_config_peer)|list|
+    product(itemsca.results|map(attribute='files')|sum(start=[])|map(attribute='path'))|list
+    }}
+  loop_control:
+    index_var: my_idx
+  when: >-
+    item[0][0].1.path.split('/')[-1] == item[0][1].domain and item[0][1].domain
+    == item[1].split('/')[-3] and inventory_hostname == "ca."~item[0][1].domain
+  tags:
+  - bm-set
+
+- name: Create CA telegraf configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/telegraf-container.j2"
+    dest: >-
+      {{ MAIN_CONFIG_PATH }}/ca_configs/telegraf_ca.{{ item[0][0].1.path.split('/')[-1]
+      }}.conf
+  loop: >-
+    {{
+    items.results|map(attribute='files')|sum(start=[])|map(attribute='path')|list|
+    zip(dir.files)|list | product(certificates_config_peer)|list|
+    product(itemsca.results|map(attribute='files')|sum(start=[])|map(attribute='path'))|list
+    }}
+  loop_control:
+    index_var: my_idx
+  when: >-
+    item[0][0].1.path.split('/')[-1] == item[0][1].domain and item[0][1].domain
+    == item[1].split('/')[-3] and inventory_hostname == "ca."~item[0][1].domain
+  tags:
+  - bm-set
+
+- name: Find files on remote machine
+  find:
+    paths: "{{ MAIN_CONFIG_PATH }}/ca_configs"
+    patterns: "*.yaml"
+  register: output
+  tags:
+  - bm-set
+
+- name: Stop CA containers
+  docker_compose:
+    project_src: "{{ MAIN_CONFIG_PATH }}/ca_configs"
+    files: "{{ item.path | basename }}"
+    remove_volumes: yes
+    state: absent
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-rem
+
+- name: Run CA containers
+  docker_compose:
+    project_src: "{{ MAIN_CONFIG_PATH }}/ca_configs"
+    files: "{{ item.path | basename }}"
+    recreate: always
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-run
+
+- name: Add IP addresses to container
+  shell: "echo \"echo {{ hostvars[item]['serverip'] }} {{item}} >> /etc/hosts\" | docker exec -i {{ inventory_hostname }} /bin/sh -"
+  when: BRIDGED_MODE and hostvars[item]['serverip'] is defined
+  loop: "{{ groups.all }}"
+  tags:
+  - bm-set

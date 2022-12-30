@@ -1,0 +1,92 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Delete temporary directory for node configuration files
+  file:
+    path: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/"
+    state: absent
+  become: true
+  tags:
+  - bm-set
+- name: Create temporary directory for node configuration files
+  file:
+    path: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/"
+    state: "directory"
+  tags:
+  - bm-set
+- name: Delete temporary directory for node istanbulbft configuration files
+  file:
+    path: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/istanbulbft"
+    state: absent
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Create temporary directory for node istanbulbft configuration files
+  file:
+    path: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/istanbulbft"
+    state: directory
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+#- name: Remove quorum directory
+#  file:
+#    path: "{{ LOCAL_QUORUM_PATH }}"
+#    state: absent
+#  become: true
+- name: Delete quorum-related directory
+  file:
+    path: "{{ BASE_PATH }}/quorum-related"
+    state: absent
+  tags:
+  - bm-set
+- name: Create quorum-related directory
+  file:
+    path: "{{ BASE_PATH }}/quorum-related"
+    state: directory
+  tags:
+  - bm-set
+- name: Create quorum-nodes directory
+  file:
+    path: "{{ BASE_PATH }}/quorum-related/quorum-nodes"
+    state: directory
+  tags:
+  - bm-set
+- name: Delete keys.txt
+  file:
+    path: "{{ MAIN_CONFIG_PATH }}/keys.txt"
+    state: absent
+  tags:
+  - bm-set
+- name: Create keys.txt
+  file:
+    path: "{{ MAIN_CONFIG_PATH }}/keys.txt" 
+    state: touch
+  tags:
+  - bm-set
+- name: Delete wallets.txt
+  file:
+    path: "{{ MAIN_CONFIG_PATH }}/wallets.txt"
+    state: absent
+  tags:
+  - bm-set
+- name: Create wallets.txt
+  file:
+    path: "{{ MAIN_CONFIG_PATH }}/wallets.txt"
+    state: touch
+  tags:
+  - bm-set
+- name: Prepare enodes.json step 1
+  lineinfile:
+    line: "[\n\n"
+    insertbefore: BOF
+    create: "yes"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/enodes.json"
+  tags:
+  - bm-set
+- name: Prepare enodes.json step 2
+  lineinfile:
+    line: "\n\n]"
+    insertbefore: EOF
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/enodes.json"
+  tags:
+  - bm-set

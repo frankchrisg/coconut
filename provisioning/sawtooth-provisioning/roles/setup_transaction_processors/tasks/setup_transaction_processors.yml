@@ -1,0 +1,101 @@
+- name: Delete transaction processor directory
+  file:
+    path: "{{ LOCAL_TRANSACTION_PROCESSOR_PATH }}"
+    state: absent
+  tags:
+  - bm-set
+- name: Create transaction processor directory
+  file:
+    path: "{{ LOCAL_TRANSACTION_PROCESSOR_PATH }}"
+    state: directory
+  tags:
+  - bm-set
+#- name: Copy transaction processor binary
+#  copy:
+#    src: "{{ LOCAL_TRANSACTION_PROCESSOR_PATH }}/{{ x_item.binary_name }}"
+#    dest: "{{ LOCAL_TRANSACTION_PROCESSOR_PATH }}/{{ x_item.binary_name }}"
+#    mode: '0755'
+#    remote_src: "no"
+#  loop: "{{ transaction_processors|list }}"
+#  loop_control:
+#    loop_var: x_item
+#    index_var: my_idx
+#  when: "inventory_hostname not in validators_to_exclude_from_transaction_processors"
+
+- name: Compress tp directory
+  archive:
+    path: "{{ LOCAL_TRANSACTION_PROCESSOR_PATH }}"
+    dest: "{{ LOCAL_TRANSACTION_PROCESSOR_PATH }}.tgz"
+    exclude_path:
+      - "{{ LOCAL_TRANSACTION_PROCESSOR_PATH }}/.git"
+  delegate_to: localhost
+  run_once: true
+  when: "inventory_hostname not in validators_to_exclude_from_transaction_processors"
+  tags:
+  - bm-set
+
+- name: Copy the tp path
+  unarchive:
+    src: "{{ LOCAL_TRANSACTION_PROCESSOR_PATH }}.tgz"
+    dest: "{{ LOCAL_TRANSACTION_PROCESSOR_PATH }}/../"
+  tags:
+  - bm-set
+
+- name: Get validator ip and port
+  shell: "echo 'cat /etc/sawtooth/validator.toml | grep -oP \"(?<=component:tcp://).*(?=\\\",)\"' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  register: ip_and_port
+  tags:
+  - bm-set
+
+- name: Get validator port
+  shell: "echo 'cat /etc/sawtooth/validator.toml | grep -oP \"(?<=component:tcp://).*(?=\\\",)\" | sed \"s/[^,:]*://g\"' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  register: validator_port
+  tags:
+  - bm-set
+
+- name: Output validator ip and port
+  debug:
+    msg: "{{ ip_and_port.stdout }}"
+  tags:
+  - bm-set
+- name: Create transaction processor start script
+  copy: 
+    content: "#!/bin/bash\n
+    ./{{ x_item.binary_name }} {{ x_item.args }} tcp://{% if ip_and_port.stdout | trim | regex_search(\"^0.0.0.0\") %}{{ hostvars[inventory_hostname][\"serverip\"] }}:{{ validator_port.stdout }}{% else %}{{ x_item.host if x_item.host is defined else ip_and_port.stdout }}{% endif %} &>> /tp_logs/{{ x_item.binary_name }}_tp.log &\n
+    exit 0"
+    dest: "{{ LOCAL_TRANSACTION_PROCESSOR_PATH }}//{{ x_item.binary_name }}.sh"
+    mode: "0755"
+  loop: "{{ transaction_processors|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: my_idx
+  when: "inventory_hostname not in validators_to_exclude_from_transaction_processors"
+  tags:
+  - bm-set
+- name: Copy transaction processor to container
+  shell: "docker cp {{ LOCAL_TRANSACTION_PROCESSOR_PATH }}//{{ x_item.binary_name }} {{ inventory_hostname }}:/{{ x_item.binary_name }}"
+  loop: "{{ transaction_processors|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: my_idx
+  when: "inventory_hostname not in validators_to_exclude_from_transaction_processors"
+  tags:
+  - bm-set
+- name: Copy transaction processor start script to container
+  shell: "docker cp {{ LOCAL_TRANSACTION_PROCESSOR_PATH }}//{{ x_item.binary_name }}.sh {{ inventory_hostname }}:/{{ x_item.binary_name }}.sh"
+  loop: "{{ transaction_processors|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: my_idx
+  when: "inventory_hostname not in validators_to_exclude_from_transaction_processors"
+  tags:
+  - bm-set
+- name: Start transaction processor
+  shell: "echo 'chmod +x {{ x_item.binary_name }} && /bin/bash /{{ x_item.binary_name }}.sh' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  loop: "{{ transaction_processors|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: my_idx
+  when: "inventory_hostname not in validators_to_exclude_from_transaction_processors"
+  tags:
+  - bm-set

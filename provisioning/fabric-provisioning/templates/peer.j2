@@ -1,0 +1,137 @@
+version: '2'
+
+volumes:
+  {{ item.hostname }}{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}:
+#  {{ item.hostname }}{{ my_idx }}.{{ item.domain }}:
+
+#networks:
+#  {{ NET_NAME }}:
+
+{% if BRIDGED_MODE -%}
+networks:
+  fabric:
+
+networks:
+  peer:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: {{ BRIDGED_IP_PREFIX }}0/16
+{% endif %}
+
+services:
+  {{ item.hostname }}{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}:
+      container_name: {{ item.hostname }}{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}
+#  {{ item.hostname }}{{ my_idx }}.{{ item.domain }}:
+#      container_name: {{ item.hostname }}{{ my_idx }}.{{ item.domain }}
+      extends:
+        file: peer-common.yaml
+        service: peer-base
+
+      {% if BRIDGED_MODE -%}
+      #network_mode: "bridge"
+      networks:
+        peer:
+          ipv4_address: {{ BRIDGED_IP_PREFIX }}{{ 1 + peer_bridge_ip.stdout | int }}
+
+      ports:
+        - {{ 7000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}:{{ 7000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+        - {{ 15000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}:{{ 15000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+        - {{ 16000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}:{{ 16000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+        - {{ 17000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}:{{ 17000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+        - {{ 63000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}:{{ 63000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+#        - {{ 7000 + outer_index*100 + my_idx }}:{{ 7000 + outer_index*100 + my_idx }}
+#        - {{ 15000 + outer_index*100 + my_idx }}:{{ 15000 + outer_index*100 + my_idx }}
+#        - {{ 16000 + outer_index*100 + my_idx }}:{{ 16000 + outer_index*100 + my_idx }}
+#        - {{ 17000 + outer_index*100 + my_idx }}:{{ 17000 + outer_index*100 + my_idx }}
+#        - {{ 63000 + outer_index*100 + my_idx }}:{{ 63000 + outer_index*100 + my_idx }}
+      extra_hosts:
+        - "couchdb{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}:{{ hostvars["peer"~groups['peer'].index(inventory_hostname)~"."~item.domain]['serverip'] }}"
+#        - "couchdb{{ my_idx }}.{{ item.domain }}:{{ hostvars["peer"~my_idx~"."~item.domain]['serverip'] }}"
+
+      {% else -%}
+      network_mode: "host"
+      {% endif %}
+
+      environment:
+        - DEBIAN_FRONTEND=noninteractive
+{% if (IMAGE_TAG.split(".")[0] + "." + IMAGE_TAG.split(".")[1])|float >= 1.4 %}
+        # This function is assumed to work with Hyperledger Fabric version 1.4 and newer
+        - CORE_METRICS_STATSD_ADDRESS={{ groups['statsd'].0 }}:8125
+        - CORE_METRICS_PROVIDER=statsd
+        - CORE_METRICS_STATSD_PREFIX={{ item.hostname }}{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}
+#        - CORE_METRICS_STATSD_PREFIX={{ item.hostname }}{{ my_idx }}.{{ item.domain }}
+        - CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:{{ 63000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+#        - CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:{{ 63000 + outer_index*100 + my_idx }}
+{% endif %}
+        - CORE_PEER_ID={{ item.hostname }}{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}
+        - CORE_PEER_LISTENADDRESS=0.0.0.0:{{ 7000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+        - CORE_PEER_PROFILE_LISTENADDRESS=0.0.0.0:{{ 15000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+        - CORE_PEER_EVENTS_ADDRESS=0.0.0.0:{{ 17000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+        - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:{{ 16000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+#        - CORE_PEER_ID={{ item.hostname }}{{ my_idx }}.{{ item.domain }}
+#        - CORE_PEER_LISTENADDRESS=0.0.0.0:{{ 7000 + outer_index*100 + my_idx }}
+#        - CORE_PEER_PROFILE_LISTENADDRESS=0.0.0.0:{{ 15000 + outer_index*100 + my_idx }}
+#        - CORE_PEER_EVENTS_ADDRESS=0.0.0.0:{{ 17000 + outer_index*100 + my_idx }}
+#        - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:{{ 16000 + outer_index*100 + my_idx }}
+        {% if BRIDGED_MODE -%}
+        - CORE_PEER_ADDRESS={{ item.hostname }}{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}:{{ 7000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+#        - CORE_PEER_ADDRESS={{ item.hostname }}{{ my_idx }}.{{ item.domain }}:{{ 7000 + outer_index*100 + my_idx }}
+#{{ BRIDGED_IP_PREFIX }}{{ 1 + peer_bridge_ip.stdout | int }}:{{ 7000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+#{{ BRIDGED_IP_PREFIX }}{{ 1 + peer_bridge_ip.stdout | int }}:{{ 7000 + outer_index*100 + my_idx }}
+        {% else -%}
+        - CORE_PEER_ADDRES={{ item.hostname }}{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}:{{ 7000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+#        - CORE_PEER_ADDRES={{ item.hostname }}{{ my_idx }}.{{ item.domain }}:{{ 7000 + outer_index*100 + my_idx }}
+        {% endif %}
+        
+        - CORE_PEER_LOCALMSPID={{ item.id }}
+        - CORE_CHAINCODE_LOGGING_LEVEL=INFO
+        # DEBUG
+        - CORE_CHAINCODE_LOGGING_SHIM=INFO
+        # DEBUG
+        
+        {% if JAVARUNTIME_DOCKER_IMAGE is defined %}- CORE_CHAINCODE_JAVA_RUNTIME={{ JAVARUNTIME_DOCKER_IMAGE }}{% endif -%}
+        
+        - CORE_CHAINCODE_BUILDER={{ CCENV_DOCKER_IMAGE }}
+        
+        {% if GOLANGRUNTIME_DOCKER_IMAGE is defined %}- CORE_CHAINCODE_GOLANG_RUNTIME={{ GOLANGRUNTIME_DOCKER_IMAGE }}{% endif -%}
+        
+        {% if NODEJSRUNTIME_DOCKER_IMAGE is defined %}- CORE_CHAINCODE_NODE_RUNTIME={{ NODEJSRUNTIME_DOCKER_IMAGE }}{% endif -%}
+        - CORE_LOGGING_PEER=INFO
+        # DEBUG
+        - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.{{ item.domain }}:{{ 7000 + outer_index*100 }}
+#7051
+        - CORE_PEER_GOSSIP_EXTERNALENDPOINT={{ item.hostname }}{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}:{{ 7000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+#        - CORE_PEER_GOSSIP_EXTERNALENDPOINT={{ item.hostname }}{{ my_idx }}.{{ item.domain }}:{{ 7000 + outer_index*100 + my_idx }}
+{% if ENABLE_COUCHDB %}
+        - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+        - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}:{{ 5000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+#        - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb{{ my_idx }}.{{ item.domain }}:{{ 5000 + outer_index*100 + my_idx }}
+        - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+        - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=admin
+{% endif %}
+      volumes:
+          - /var/run/:/host/var/run/
+          - {{ LOCAL_CRYPTO_PATH }}/crypto-config/peerOrganizations/{{ item.domain }}/peers/{{ item.hostname }}{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}/msp:/etc/hyperledger/fabric/msp
+          - {{ LOCAL_CRYPTO_PATH }}/crypto-config/peerOrganizations/{{ item.domain }}/peers/{{ item.hostname }}{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}/tls:/etc/hyperledger/fabric/tls
+          - {{ item.hostname }}{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}:/var/hyperledger/production
+#          - {{ LOCAL_CRYPTO_PATH }}/crypto-config/peerOrganizations/{{ item.domain }}/peers/{{ item.hostname }}{{ my_idx }}.{{ item.domain }}/msp:/etc/hyperledger/fabric/msp
+#          - {{ LOCAL_CRYPTO_PATH }}/crypto-config/peerOrganizations/{{ item.domain }}/peers/{{ item.hostname }}{{ my_idx }}.{{ item.domain }}/tls:/etc/hyperledger/fabric/tls
+#          - {{ item.hostname }}{{ my_idx }}.{{ item.domain }}:/var/hyperledger/production
+          - /etc/timezone:/etc/timezone
+          - /etc/security/limits.conf:/etc/security/limits.conf
+          - /etc/sysctl.conf:/etc/sysctl.conf
+          {% if not BUILD_TELEGRAF -%}
+          - {{ MAIN_CONFIG_PATH }}/telegraf/usr/bin/telegraf:/bin/telegraf
+          {% endif -%}
+          - {{ MAIN_CONFIG_PATH }}/peer_configs/telegraf_peer{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}.conf:/etc/telegraf/telegraf.conf
+#          - {{ MAIN_CONFIG_PATH }}/peer_configs/telegraf_peer{{ my_idx }}.{{ item.domain }}.conf:/etc/telegraf/telegraf.conf
+          - /var/lib/docker:/var/lib/docker
+#      ports:
+#        - {{ 7000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}:7051
+#        - {{ 17000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}:7053
+#        - {{ 7000 + outer_index*100 + my_idx }}:7051
+#        - {{ 17000 + outer_index*100 + my_idx }}:7053
+#      networks:
+#        - {{ NET_NAME }}

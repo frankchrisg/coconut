@@ -1,0 +1,6 @@
+0xc0eea25ad72a31a5fde5e7374b4b9815b9051950 | smallbank 
+0x3ef6fbdaf080cf2571ca64d1bd0ceac4f6f02e4c | key_value 
+0x268a540c327de7a869ee98fb7a4f2a5e0d704229 | doNothing 
+0x6f66cb45c902b704b26b2808512d69164788951e | smallbank 
+0x816bd944930d6d909eca1b5a7ae3e71b9023684c | key_value 
+0xcf7a5275640c04d2eccc9906ff70ccf9930863f1 | doNothing 

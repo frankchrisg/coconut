@@ -1,0 +1,6 @@
+- name: Pull CouchDB image
+  docker_image:
+    name: "hyperledger/fabric-couchdb:{{ THIRDPARTY }}"
+    tag: "fabric-couchdb"
+  tags:
+  - bm-set

@@ -1,0 +1,29 @@
+- name: Init docker swarm
+  shell: "docker swarm leave --force || true && docker swarm init --advertise-addr {{ hostvars[inventory_hostname]['serverip'] }}"
+  when: BRIDGED_MODE and hostvars[inventory_hostname]['swarmmanager'] is defined and hostvars[inventory_hostname]['swarmmanager'] | bool
+  ignore_errors: true
+- name: Remove inactive nodes
+  shell: "docker node rm $(docker node ls | grep Down | awk '{split($0,a,\" \"); print a[1]}')"
+  when: BRIDGED_MODE and hostvars[inventory_hostname]['swarmmanager'] is defined and hostvars[inventory_hostname]['swarmmanager'] | bool
+  ignore_errors: true
+- name: Get swarm join command
+  shell: "docker swarm join-token worker | grep SWMTKN"
+  register: command
+  when: BRIDGED_MODE and hostvars[inventory_hostname]['swarmmanager'] is defined and hostvars[inventory_hostname]['swarmmanager'] | bool
+#- name: Get swarm token
+#  shell: "docker swarm join-token worker | grep SWMTKN | awk '{split($0,a,\" \"); print a[5]}'"
+#  register: token
+#  when: BRIDGED_MODE and hostvars[inventory_hostname]['swarmmanager'] is defined and hostvars[inventory_hostname]['swarmmanager'] | bool
+- name: Get swarm ip
+  shell: "docker swarm join-token worker | grep SWMTKN | awk '{split($0,a,\" \"); print a[6]}'"
+  register: swarmip
+  when: BRIDGED_MODE and hostvars[inventory_hostname]['swarmmanager'] is defined and hostvars[inventory_hostname]['swarmmanager'] | bool
+- name: Add docker worker
+  shell: "docker swarm leave || true && {{ hostvars[item].command.stdout }}"
+  when: BRIDGED_MODE and (hostvars[inventory_hostname]['swarmmanager'] is not defined or not hostvars[inventory_hostname]['swarmmanager'] | bool) and hostvars[item].command.stdout is defined and hostvars[inventory_hostname]['swarmworker'] is defined and hostvars[inventory_hostname]['swarmworker'] | bool
+#  when: hostvars[item].command is defined
+#  when: BRIDGED_MODE and not hostvars[inventory_hostname]['swarmmanager'] | bool and hostvars[item].command is defined and hostvars[inventory_hostname]['swarmworker'] is defined and hostvars[inventory_hostname]['swarmworker'] | bool
+  loop: "{{ groups.realservers }}"
+- name: Add docker overlay network
+  shell: "docker network create --driver overlay --attachable --subnet={{ SWARM_PREFIX }}0/16 --ip-range={{ SWARM_PREFIX }}0/16 --gateway={{ SWARM_PREFIX }}1 overlaynetwork_corda"
+  when: BRIDGED_MODE and hostvars[inventory_hostname]['swarmmanager'] is defined and hostvars[inventory_hostname]['swarmmanager'] | bool

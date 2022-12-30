@@ -1,0 +1,41 @@
+{
+  "alloc": {
+{% for address in all_keys.results %}
+"{{ address.item }}": {
+  "balance": "{{ DEFAULT_INIT_BALANCE }}"
+}{% if not loop.last %},{% endif %}
+{% endfor %}
+},
+ "coinbase": "0x0000000000000000000000000000000000000000",
+ "config": {
+   "homesteadBlock": 0,
+   "byzantiumBlock": 0,
+   "chainId": 10,
+   "eip150Block": 0,
+   "eip155Block": 0,
+   "eip150Hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+   "eip158Block": 0,
+   "constantinopleBlock": 0,
+   "petersburgBlock": 0,
+   "txnSizeLimit": {{ TX_SIZE_LIMIT }},
+   "maxCodeSize": 0,
+   {% if CONSENSUS_NAME == "clique" %}
+   "clique": {
+     "period": {{ CLIQUE_PERIOD }},
+     "epoch": {{ CLIQUE_EPOCH }}
+   }
+   {% else %}
+     "ethash": {}
+   {% endif%}
+  },
+ "difficulty": "0x1",
+{% if CONSENSUS_NAME == "ethash" %}
+ "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000",
+{% else %}
+ "extradata": "0x0000000000000000000000000000000000000000000000000000000000000000{% for signer_key in all_keys_signer.results %}{{ signer_key.item }}{% endfor %}0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+{% endif %}
+ "gasLimit": "{{ GENESIS_GAS_LIMIT }}",
+ "nonce": "0x0",
+ "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+ "timestamp": "0x00"
+}

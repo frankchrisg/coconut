@@ -1,0 +1,94 @@
+- name: Clone Graphene
+  git:
+    repo: 'https://github.com/bitshares/bitshares-core.git'
+    dest: "{{ GRAPHENE_PATH }}"
+    version: "{{ GRAPHENE_HEAD }}"
+    force: "{{ GRAPHENE_FORCE_CLONE }}"
+  throttle: 5
+  when: GRAPHENE_CLONE
+  tags:
+  - bm-set  
+- name: Update submodules
+  shell: "cd {{ GRAPHENE_PATH }} && git submodule update --init --recursive"
+  when: GRAPHENE_CLONE
+  tags:
+  - bm-set
+- name: Clean temporary operations path
+  file:
+    state: absent
+    path: "{{ GRAPHENE_CUSTOM_OPERATIONS_TMP_DIR_FULL }}"
+  when: GRAPHENE_CUSTOM_OPERATIONS
+  tags:
+  - bm-set
+- name: Copy operations to temp dir
+  copy:
+    src: "{{ GRAPHENE_CUSTOM_OPERATIONS_FILE_PATH }}"
+    dest: "{{ GRAPHENE_CUSTOM_OPERATIONS_TMP_DIR }}"
+  when: GRAPHENE_CUSTOM_OPERATIONS
+  tags:
+  - bm-set
+- name: Copy operations before compilation
+  shell: "cp -rf {{ GRAPHENE_CUSTOM_OPERATIONS_TMP_DIR_FULL }}/* {{ GRAPHENE_PATH }}/"
+  when: GRAPHENE_CUSTOM_OPERATIONS
+  tags:
+  - bm-set
+- name: Create elasticsearch file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/es_fix.j2"
+    dest: "{{ GRAPHENE_PATH }}/libraries/plugins/elasticsearch/elasticsearch_plugin.cpp"
+  when: OVERWRITE_ES_FILE
+  tags:
+  - bm-set
+- name: Execute cmake
+  shell: "cd {{ GRAPHENE_PATH }} && $(which cmake) ."
+  when: MAKE_PROCESS
+  tags:
+  - bm-set
+- name: Output number of cores
+  debug:
+    msg: "architecture: {{ ansible_facts.architecture }}
+          cores: {{ ansible_facts.processor_cores }}
+          count: {{ ansible_facts.processor_count }}
+          threads_per_core: {{ ansible_facts.processor_threads_per_core }}
+          vcpus: {{ ansible_facts.processor_vcpus }}
+          vCores x 1.5: {{ (ansible_facts.processor_vcpus * 1.5) | int }}"
+  tags:
+  - bm-set
+- name: Adjust makeflags
+  lineinfile:
+    path: "{{ GRAPHENE_PATH }}/Makefile"
+    insertbefore: 'BOF'
+    line: "MAKEFLAGS := --jobs {% if MAKE_JOBS is not defined %}{{ (ansible_facts.processor_vcpus * 1.5) | int }}{% else %}{{ MAKE_JOBS | int }}{% endif %}"
+  when: MAKE_PROCESS
+#  loop: "{{ ['{{ GRAPHENE_PATH }}/Makefile', '{{ GRAPHENE_PATH }}/programs/cli_wallet/Makefile', '{{ GRAPHENE_PATH }}/programs/witness_node/Makefile'] | flatten(levels=1 )}}"
+  tags:
+  - bm-set
+- name: Make graphene makefile
+  make:
+    chdir: "{{ GRAPHENE_PATH }}"
+  register: build_success
+  retries: "{{ MAKE_RETRIES }}"
+  until: build_success is success
+  when: MAKE_PROCESS
+  tags:
+  - bm-set
+- name: Get current user
+  command: whoami
+  register: current_user
+  tags:
+  - bm-set
+- name: chown directories to current user
+  file:
+    dest: "{{ GRAPHENE_PATH }}"
+    owner: "{{ current_user.stdout }}"
+    group: "{{ current_user.stdout }}"
+    recurse: "yes"
+  become: true
+  register: output
+  tags:
+  - bm-set
+  - chown
+- name: Debug chown output
+  debug:
+    msg: "{{ output }}"
+  tags: "chown"

@@ -1,0 +1,51 @@
+version: "2"
+
+volumes:
+  {{ inventory_hostname }}:
+
+#networks:
+#  {{ NET_NAME }}:
+
+{% if BRIDGED_MODE -%}
+networks:
+  overlaynetwork_corda:
+    external: true
+    driver: overlay
+{% endif %}
+
+services:
+  {{ inventory_hostname }}:
+    container_name: {{ inventory_hostname }}
+    image: {{ DOCKERFILE_NAME }}
+    {% if BRIDGED_MODE -%}
+    networks:
+      overlaynetwork_corda:
+        ipv4_address: {{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(inventory_hostname) + 3) }}
+#    network_mode: "bridge"
+    ports:
+      - {{ JOLOKIA_START_PORT + groups['node'].index(inventory_hostname) }}:{{ JOLOKIA_START_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ CONSENSUS_START_PORT + groups['node'].index(inventory_hostname) * 10 }}:{{ CONSENSUS_START_PORT + groups['node'].index(inventory_hostname) * 10 }}
+      - {{ P2P_START_PORT + groups['node'].index(inventory_hostname) }}:{{ P2P_START_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ RPC_START_PORT + groups['node'].index(inventory_hostname) }}:{{ RPC_START_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ RPC_ADMIN_START_PORT + groups['node'].index(inventory_hostname) }}:{{ RPC_ADMIN_START_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ DT_SOCKET_START_PORT + groups['node'].index(inventory_hostname) }}:{{ DT_SOCKET_START_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ JMX_MONITORING_HTTP_START_PORT + groups['node'].index(inventory_hostname) }}:{{ JMX_MONITORING_HTTP_START_PORT + groups['node'].index(inventory_hostname) }}
+    {% else -%}
+    network_mode: "host"
+    {% endif %}
+
+    restart: always
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+    #    ports:
+    #      - "{{ 8800 + groups['node'].index(inventory_hostname) }}:7054"
+    command: tail -f /dev/null
+    volumes:
+      - {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/:{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/
+      - {{ CORDA_PATH }}/jmx2graphite-1.4.3-javaagent.jar:{{ CORDA_PATH }}/jmx2graphite.jar
+      - {{ CORDA_PATH }}/corda.jar:{{ CORDA_PATH }}/corda.jar
+      - {{ CORDA_PATH }}/drivers/:{{ CORDA_PATH }}/drivers/
+      - /etc/timezone:/etc/timezone
+      - /etc/security/limits.conf:/etc/security/limits.conf
+      - /etc/sysctl.conf:/etc/sysctl.conf
+      - {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}_telegraf.conf:/etc/telegraf/telegraf_cst.conf

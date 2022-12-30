@@ -1,0 +1,8 @@
+#!/usr/bin/expect
+cd {{ LOCAL_DIEM_PATH }}
+
+set timeout -1
+
+spawn cargo run -p diem-swarm -- --diem-node target/debug/diem-node -n {{ NUMBER_OF_NODES_TOTAL }} -c {{ DIEM_NODE_CONFIGURATION_PATH }}/{{ DIEM_NODE_CONFIGURATION_DIR }} --node-args "{% for host in groups['node'] %}{% if BRIDGED_MODE %}{{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(host) + 3) }}{% else %}{{ hostvars[host]['serverip'] }}{% endif %}:{{ COMMUNICATION_START_PORT + loop.index0 }}{{ '' if loop.last else ',' }}{% endfor %}" --node-paths "{% for host in groups['node'] %}{{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ host }}/diem-node-{{ loop.index0 }}.yaml{{ '' if loop.last else ',' }}{% endfor %}" --num-prepare-accounts {{ NUM_PREPARE_ACCOUNTS }}
+expect "CTRL-C to exit."
+send \x03

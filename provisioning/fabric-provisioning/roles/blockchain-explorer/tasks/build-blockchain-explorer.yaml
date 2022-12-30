@@ -1,0 +1,93 @@
+- name: Get Blockchain-Explorer repository
+  git:
+    repo: "https://github.com/hyperledger/blockchain-explorer.git"
+    dest: "{{ BLOCKCHAIN_EXPLORER_PATH }}/blockchain-explorer"
+    update: "{{ UPDATE_BLOCKCHAIN_EXPLORER_REPOSITORY }}"
+    force: "{{ UPDATE_BLOCKCHAIN_EXPLORER_REPOSITORY }}"
+    version: "{{ BE_VERSION }}"
+  throttle: 5
+- name: Copy the modified Dockerfile
+  copy:
+    src: "{{ MAIN_CONFIG_PATH }}/Blockchain-Explorer-Dockerfile"
+    dest: "{{ BLOCKCHAIN_EXPLORER_PATH }}/blockchain-explorer/Dockerfile"
+- name: Create blockchain-explorer-config.json   
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/blockchain-explorer-config.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/blockchain-explorer_configs/blockchain-explorer-config.json"
+- name: Create blockchain-explorer-config-main.json   
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/blockchain-explorer-config-main.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/blockchain-explorer_configs/blockchain-explorer-config-main.json"
+- name: Create appconfig.json
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/blockchain-explorer-appconfig.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/blockchain-explorer_configs/appconfig.json"
+- name: Build the Hyperledger image for explorer
+  docker_image:
+    path: "{{ BLOCKCHAIN_EXPLORER_PATH }}/blockchain-explorer"
+    name: blockchain-explorer
+    force: "{{ REBUILD_BLOCKCHAIN_EXPLORER_DOCKERFILE }}"
+    nocache: "yes"
+- name: Restart the Blockchain-Explorer every hour through a cronjob as the application fails periodically although the network is available
+  cron:
+    name: "Blockchain-Explorer restart"
+    minute: "*/30"
+    job: "docker restart blockchain-explorer.com"
+- name: Insert allowed connections for postgresql
+  lineinfile:
+    path: /etc/postgresql/10/main/pg_hba.conf
+    line: "host  all  all 0.0.0.0/0 md5"
+  become: true
+- name: Set listen entry for postgresql
+  lineinfile:
+    dest: /etc/postgresql/10/main/postgresql.conf
+    regexp: "^listen_addresses ="
+    line: "listen_addresses = '*'"
+    state: present
+  become: true
+  notify: "Restart PostgreSQL"
+- name: chmod 775 db folder
+  file:
+    path: "{{ BLOCKCHAIN_EXPLORER_PATH }}/blockchain-explorer/app/persistence/fabric/postgreSQL/db"
+    recurse: yes
+    mode: 0775
+- name: Execute database execution script for the blockchain-explorer
+  command: /bin/bash createdb.sh
+  args:
+    chdir: >-
+      {{ BLOCKCHAIN_EXPLORER_PATH }}/blockchain-explorer/app/persistence/fabric/postgreSQL/db
+  become: true
+  become_user: postgres
+- name: Create blockchain-explorer.yaml
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/blockchain-explorer.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/blockchain-explorer_configs/blockchain-explorer.yaml"
+  loop: "{{ groups['blockchain-explorer'] }}"
+
+- name: Stop blockchain-explorer containers
+  docker_compose:
+    project_src: "{{ MAIN_CONFIG_PATH }}/blockchain-explorer_configs"
+    files: "blockchain-explorer.yaml"
+    remove_volumes: yes
+    state: absent
+  throttle: 1
+- name: Run blockchain-explorer containers
+#  docker_service:
+#    project_src: "{{ MAIN_CONFIG_PATH }}/blockchain-explorer_configs"
+#    files: blockchain-explorer.yaml
+  docker_compose:
+    project_src: "{{ MAIN_CONFIG_PATH }}/blockchain-explorer_configs"
+    files: "blockchain-explorer.yaml"
+    recreate: always
+  throttle: 1
+
+- name: "Wait for Blockchain-Explorer container on {{inventory_hostname}}"
+  wait_for:
+    port: "3333"
+    host: "{{inventory_hostname}}"
+- name: Copy timezone
+  shell: echo "cp /usr/share/zoneinfo/Europe/Berlin /etc/localtime" | docker exec --interactive blockchain-explorer.com /bin/sh
+- name: Set timezone
+  shell: echo "echo 'Europe/Berlin' > /etc/timezone" | docker exec --interactive blockchain-explorer.com /bin/sh
+- name: Restart Blockchain-Explorer container
+  shell: docker restart blockchain-explorer.com

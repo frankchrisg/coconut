@@ -1,0 +1,34 @@
+package com.template.contracts;
+
+import net.corda.core.contracts.CommandData;
+import net.corda.core.contracts.Contract;
+import net.corda.core.transactions.LedgerTransaction;
+import org.jetbrains.annotations.NotNull;
+
+public class SmallBankContract implements Contract {
+
+    public static class WriteCheck implements CommandData {
+    }
+
+    public static class DepositChecking implements CommandData {
+    }
+
+    public static class TransactSavings implements CommandData {
+    }
+
+    public static class SendPayment implements CommandData {
+    }
+
+    public static class Balance implements CommandData {
+    }
+
+    public static class Amalgamate implements CommandData {
+    }
+
+    public static class CreateAccount implements CommandData {
+    }
+
+    @Override
+    public void verify(@NotNull final LedgerTransaction tx) {
+    }
+}

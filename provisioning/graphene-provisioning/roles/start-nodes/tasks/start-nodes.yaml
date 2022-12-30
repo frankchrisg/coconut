@@ -1,0 +1,159 @@
+- name: Create api-access configuration
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/api-access.j2"
+    dest: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}-api-access.json"
+  tags:
+  - bm-set
+- name: Create telegraf.conf
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/telegraf-container.j2"
+    dest: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}_telegraf.conf"
+  tags:
+  - bm-set
+- name: Create node configuration
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/node-compose.j2"
+    dest: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}-compose.yaml"
+  tags:
+  - bm-set
+- name: Find files on remote machine (Nodes)
+  find:
+    paths: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/"
+    patterns: "{{ inventory_hostname }}-*.yaml"
+  register: output
+  tags:
+  - bm-set
+
+- name: Stop node containers
+  docker_compose:
+    project_src: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/"
+    files: "{{ item.path | basename }}"
+    remove_volumes: yes
+    state: absent
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-rem
+
+- name: Run node containers
+#  docker_service:
+#    project_src: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/"
+#    files: "{{ item.path | basename }}"
+#  loop: "{{ output.files|flatten(levels=1) }}"
+  docker_compose:
+    project_src: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/"
+    files: "{{ item.path | basename }}"
+    recreate: always
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-run
+
+- name: Add IP addresses to container
+  shell: "echo \"echo {{ hostvars[item]['serverip'] }} {{item}} >> /etc/hosts\" | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: BRIDGED_MODE and hostvars[item]['serverip'] is defined
+  loop: "{{ groups.all }}"
+  tags:
+  - bm-set
+- name: Initialise telegraf
+#  shell: "echo 'curl -sL https://repos.influxdata.com/influxdb.key | apt-key add - && apt-add-repository \"deb https://repos.influxdata.com/ubuntu bionic stable\" && apt-get update && apt-get install -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" telegraf && service telegraf restart' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  shell: "echo 'service telegraf restart' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  tags:
+  - bm-set
+- name: Create start script
+  shell: 'echo "echo \"#!/bin/bash\nnohup {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/witness_node {% if hostvars[inventory_hostname][''stale_production''] is defined and hostvars[inventory_hostname][''stale_production''] | bool %} --enable-stale-production {% endif %} {% if hostvars[inventory_hostname][''resync-blockchain''] is defined and hostvars[inventory_hostname][''resync-blockchain''] | bool %} --resync-blockchain {% endif %} {% if hostvars[inventory_hostname][''required_participation''] is defined %} --required-participation {{ required_participation }} {% endif %} {% if GENESIS_TIMESTAMP > 0 %}--genesis-timestamp {{ GENESIS_TIMESTAMP }}{% endif %} --data-dir={{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/datadir/ >/dev/null 2>&1 &\" > {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh" | docker exec -i {{ inventory_hostname }} /bin/bash -'
+#  shell: 'echo "echo \"#!/bin/bash\nnohup {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/witness_node {% if hostvars[inventory_hostname][''stale_production''] is defined and hostvars[inventory_hostname][''stale_production''] | bool %} --enable-stale-production {% endif %} --resync-blockchain {% if GENESIS_TIMESTAMP > 0 %}--genesis-timestamp {{ GENESIS_TIMESTAMP }}{% endif %} --data-dir={{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/datadir/ >/dev/null 2>&1 &\" > {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh" | docker exec -i {{ inventory_hostname }} /bin/bash -'
+  tags:
+  - bm-set
+- name: Wait before start
+  shell: "sleep {{ SLEEP_BEFORE_NODE_START }}"
+  tags:
+  - bm-set
+- name: Start node on {{ inventory_hostname }}
+  shell: "echo '$(which chmod) +x {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh && /bin/bash {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: hostvars[inventory_hostname]['stale_production'] is defined and hostvars[inventory_hostname]['stale_production'] | bool
+  tags:
+  - bm-run
+
+#- name: Obtain chain id
+#  shell: "$(which curl) --data '{\"jsonrpc\": \"2.0\", \"method\": \"get_chain_properties\", \"params\": [], \"id\":1}' http://{{ hostvars[inventory_hostname]['serverip'] }}:{{ RPC_START_PORT + groups['node'].index(inventory_hostname) }}/rpc | jq '.result.chain_id'"
+#  register: chain_id
+#  until: chain_id.stdout != ""
+#  retries: "{{ CHAIN_ID_POLL_RETRIES }}"
+#  delay: "{{ CHAIN_ID_POLL_DELAY }}"
+#  when: hostvars[inventory_hostname]['stale_production'] is defined and hostvars[inventory_hostname]['stale_production'] | bool
+#  tags:
+#  - bm-set
+
+- name: Create block creation check script
+  copy:
+    dest: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/check-block-production.sh"
+#    content: "#!/bin/bash\napt -y install psmisc -qq > /dev/null\nMINORITY_FORK_NUMBER=$(grep -c \"Not producing block because node appears to be on a minority fork\" {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/datadir/logs/default/default.log)\nGENERATED_BLOCKS_NUMBER=$(grep -c \"Generated block\" {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/datadir/logs/default/default.log)\nif [ \"$GENERATED_BLOCKS_NUMBER\" -gt {{ BLOCK_ASSURANCE_LIMIT }} ];then\necho \"true\"\nelse\n$(which killall) witness_node && /bin/bash {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh\necho \"false\"\nfi"
+    content: "#!/bin/bash\napt -y install psmisc -qq > /dev/null\nMINORITY_FORK_NUMBER=$(grep -c \"Not producing block because node appears to be on a minority fork\" {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/datadir/logs/default/default.log)\nGENERATED_BLOCKS_NUMBER=$(grep -c \"Generated block\" {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/datadir/logs/default/default.log)\nif [ \"$GENERATED_BLOCKS_NUMBER\" -gt {{ BLOCK_ASSURANCE_LIMIT }} ] && [ \"$MINORITY_FORK_NUMBER\" -eq 0 ];then\necho \"true\"\nelse\n$(which killall) witness_node && /bin/bash {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh\necho \"false\"\nfi"
+  when: hostvars[inventory_hostname]['stale_production'] is defined and hostvars[inventory_hostname]['stale_production'] | bool
+  tags:
+  - bm-set
+- name: Copy block creation check script to server
+  shell: "$(which chmod) +x {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/check-block-production.sh && docker cp {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/check-block-production.sh {{ inventory_hostname }}:/{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/check-block-production.sh"
+  when: hostvars[inventory_hostname]['stale_production'] is defined and hostvars[inventory_hostname]['stale_production'] | bool
+  tags:
+  - bm-set
+- name: Execute block creation check script
+  shell: "docker exec -i {{ inventory_hostname }} {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/check-block-production.sh"
+  register: block_creation_active
+  until: block_creation_active.stdout != "false"
+  retries: "{{ BLOCK_CREATION_POLL_RETRIES }}"
+  delay: "{{ BLOCK_CREATION_POLL_DELAY }}"
+  when: hostvars[inventory_hostname]['stale_production'] is defined and hostvars[inventory_hostname]['stale_production'] | bool
+  throttle: 1
+  tags:
+  - bm-set
+
+- name: Start node on {{ inventory_hostname }}
+  shell: "echo '$(which chmod) +x {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh && /bin/bash {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: hostvars[inventory_hostname]['stale_production'] is not defined or not hostvars[inventory_hostname]['stale_production'] | bool
+  tags:
+  - bm-run
+
+- name: Obtain chain id
+  shell: "$(which curl) --data '{\"jsonrpc\": \"2.0\", \"method\": \"get_chain_properties\", \"params\": [], \"id\":1}' http://{{ hostvars[inventory_hostname]['serverip'] }}:{{ RPC_START_PORT + groups['node'].index(inventory_hostname) }}/rpc | jq '.result.chain_id'"
+  register: chain_id
+  until: chain_id.stdout != ""
+  retries: "{{ CHAIN_ID_POLL_RETRIES }}"
+  delay: "{{ CHAIN_ID_POLL_DELAY }}"
+#  when: not hostvars[inventory_hostname]['stale_production'] | bool
+  tags:
+  - bm-set
+
+- name: Output chain id
+  debug:
+    msg: "Chain id: {{ chain_id.stdout }} Command: $(which curl) --data '{\"jsonrpc\": \"2.0\", \"method\": \"get_chain_properties\", \"params\": [], \"id\":1}' http://{{ hostvars[inventory_hostname]['serverip'] }}:{{ RPC_START_PORT + groups['node'].index(inventory_hostname) }}/rpc | jq '.result.chain_id'"
+  tags:
+  - bm-set
+- name: Create wallet start script
+  shell: 'echo "echo \"#!/bin/bash\nnohup {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/cli_wallet -d --wallet-file={{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}-wallet.json --chain-id={{ chain_id.stdout }} --server-rpc-endpoint={% if hostvars[inventory_hostname][''differentattachnode''] is not defined %}ws://{{ hostvars[inventory_hostname][''serverip''] }}:{{ RPC_START_PORT + groups[''node''].index(inventory_hostname) }}{% else %}ws://{{ hostvars[inventory_hostname][''differentattachnode''] }}{% endif %} -u {{ WS_USER }} -p {{ WS_PASSWORD }} --rpc-endpoint 0.0.0.0:{{ RPC_WALLET_PORT + groups[''node''].index(inventory_hostname) }} --rpc-http-endpoint 0.0.0.0:{{ RPC_WALLET_HTTP_PORT + groups[''node''].index(inventory_hostname) }} {{ WALLET_LOGGING_PARAMETERS }} >> {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/wallet-log-start.txt 2>&1 &\" > {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}-start-wallet.sh" | docker exec -i {{ inventory_hostname }} /bin/bash -'
+#  shell: 'echo "echo \"#!/bin/bash\nnohup {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/cli_wallet -d --wallet-file={{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}-wallet.json --chain-id={{ chain_id.stdout }} --server-rpc-endpoint={% if hostvars[inventory_hostname][''differentattachnode''] is not defined %}ws://{{ hostvars[inventory_hostname][''serverip''] }}:{{ RPC_START_PORT + groups[''node''].index(inventory_hostname) }}{% else %}ws://{{ hostvars[inventory_hostname][''differentattachnode''] }}{% endif %} -u {{ WS_USER }} -p {{ WS_PASSWORD }} --rpc-endpoint 0.0.0.0:{{ RPC_WALLET_PORT + groups[''node''].index(inventory_hostname) }} --rpc-http-endpoint 0.0.0.0:{{ RPC_WALLET_HTTP_PORT + groups[''node''].index(inventory_hostname) }} {{ WALLET_LOGGING_PARAMETERS }} >/dev/null 2>&1 &\" > {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}-start-wallet.sh" | docker exec -i {{ inventory_hostname }} /bin/bash -'
+  tags:
+  - bm-set
+- name: Create wallet.json
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/wallet.j2"
+    dest: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}-wallet.json"
+  when: COPY_PREPARED_WALLET
+  tags:
+  - bm-set
+
+- name: "Wait for port {{ RPC_START_PORT + groups['node'].index(inventory_hostname) }}"
+  wait_for:
+    port: "{{ RPC_START_PORT + groups['node'].index(inventory_hostname) }}"
+    delay: 1
+  tags:
+  - bm-set
+
+- name: Attach wallet on {{ inventory_hostname }} to {% if hostvars[inventory_hostname]['differentattachnode'] is not defined %}ws://{{ hostvars[inventory_hostname]['serverip'] }}:{{ RPC_START_PORT + groups['node'].index(inventory_hostname) }}{% else %}ws://{{ hostvars[inventory_hostname]['differentattachnode'] }}{% endif %}
+  shell: "echo 'sleep {{ CLI_SLEEP_TIME }} && $(which chmod) +x {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}-start-wallet.sh && /bin/bash {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}-start-wallet.sh' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: hostvars[inventory_hostname]['dontattach'] is not defined or not hostvars[inventory_hostname]['dontattach']
+#  throttle: 1
+  tags:
+  - bm-set
+

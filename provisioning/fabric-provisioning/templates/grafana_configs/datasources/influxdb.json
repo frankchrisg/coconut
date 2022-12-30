@@ -1,0 +1,10 @@
+{
+  "name":"metrics_fabric",
+  "type":"influxdb",
+  "url":"http://192.168.178.22:8086",
+  "access":"proxy",
+  "database":"metrics_fabric",
+  "user":"lrdata",
+  "password":"lrdata",
+  "basicauth":false
+}

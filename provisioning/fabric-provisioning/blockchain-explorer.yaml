@@ -1,0 +1,7 @@
+- import_playbook: registervars.yaml hostset=blockchain-explorer
+- hosts: blockchain-explorer
+  roles:
+    - blockchain-explorer
+  vars_files:
+    - "vars/common-vars.yaml"
+    - "vars/blockchain-explorer-vars.yaml"

@@ -1,0 +1,6 @@
+- hosts: local
+  serial: "{% if SERIAL_EXECUTION|int > 0 %}{{ SERIAL_EXECUTION|int }}{% else %}{{ SERIAL_EXECUTION_PB }}{% endif %}"
+  roles:
+    - prepareenv
+  vars_files:
+    - "vars/common-vars.yaml"

@@ -1,0 +1,45 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- include_tasks: inner-orderer.yml
+  loop: "{{ certificates_config_orderer }}"
+  loop_control:
+    loop_var: item
+    index_var: outer_index
+  tags:
+  - bm-set
+- name: Find files on remote machine
+  find:
+    paths: "{{ MAIN_CONFIG_PATH }}/orderer_configs"
+    patterns: "*.yaml"
+  register: output
+  tags:
+  - bm-set
+
+- name: Stop orderer containers
+  docker_compose:
+    project_src: "{{ MAIN_CONFIG_PATH }}/orderer_configs"
+    files: "{{ item.path | basename }}"
+    remove_volumes: yes
+    state: absent
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-rem
+
+- name: Run orderer containers
+  docker_compose:
+    project_src: "{{ MAIN_CONFIG_PATH }}/orderer_configs"
+    files: "{{ item.path | basename }}"
+    recreate: always
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-run
+  
+- name: Add IP addresses to container
+  shell: "echo \"echo {{ hostvars[item]['serverip'] }} {{item}} >> /etc/hosts\" | docker exec -i {{ inventory_hostname }} /bin/sh -"
+  when: BRIDGED_MODE and hostvars[item]['serverip'] is defined
+  loop: "{{ groups.all }}"
+  tags:
+  - bm-set

@@ -1,0 +1,80 @@
+BASE_PATH: "/home/parallels/FINAL_graphene_corda_latest_xxx"
+JAVA_PATH: "/usr/lib/jvm/java-11-openjdk-amd64/bin/java"
+LOCAL_QUORUM_PATH: "{{ BASE_PATH }}/quorum"
+BUILD_PATH: "{{ BASE_PATH }}/quorum/build/bin"
+QUORUM_URL: "https://github.com/jpmorganchase/quorum.git"
+ISTANBUL_URL: "https://github.com/jpmorganchase/istanbul-tools.git"
+CAKESHOP_URL: "https://github.com/jpmorganchase/cakeshop/releases/download/v0.11.0/cakeshop-0.11.0.war"
+PLUGINS: 'admin,db,eth,debug,miner,net,shh,txpool,personal,web3,quorum,{% if CONSENSUS_NAME == "raft" %}raft{% else %}istanbul{% endif %}'
+GO_FORCE_DOWNLOAD: yes
+GO_VERSION: "go1.13"
+NETWORK_ID: 11111
+# Default: 50
+RAFT_BLOCK_TIME: 5000
+##15000
+#5000
+#1000
+# Default: 25
+RAFT_MAXPEERS: 32
+LOGGING_VERBOSITY: 5
+TX_SIZE_LIMIT: 128
+PREFERRED_CONTRACT_SLEEP_TIME: 10000
+#26000
+# Default: 1
+ISTANBUL_BLOCKPERIOD: 5
+# Default 0 which refers to round robin 1 is equal to sticky
+ISTANBUL_POLICY: 0
+# Default 0
+ISTANBUL_CEIL_ALGORITHM: 1
+# 1
+# Default: fast
+SYNCMODE: "full"
+# Pay attention for this value
+NUMBER_OF_MINER_THREADS: 4
+NUMBER_OF_VALIDATORS_ISTANBUL: "{{ additional_nodes_per_container[0].number | int + additional_nodes_per_container[1].number | int + additional_nodes_per_container[2].number | int + additional_nodes_per_container[3].number | int + additional_nodes_per_container[4].number | int + additional_nodes_per_container[5].number | int + additional_nodes_per_container[6].number | int + additional_nodes_per_container[7].number | int + additional_nodes_per_container[8].number | int + additional_nodes_per_container[9].number | int + additional_nodes_per_container[10].number | int + additional_nodes_per_container[11].number | int + additional_nodes_per_container[12].number | int + additional_nodes_per_container[13].number | int + additional_nodes_per_container[14].number | int + additional_nodes_per_container[15].number | int }}"
+CONSENSUS_NAME: "istanbulbft"
+# Default: 700000000
+GASTARGET: 7000000000
+#7000000000
+#8000000000
+#500000000
+# Default: 800000000
+GASLIMIT: 10446744069414584320
+#10000000000
+#10446744069414584320
+#800000000000
+# Default: 0xE0000000
+GENESIS_GAS_LIMIT: 0xFFFFFFFF00000000
+# Default: any
+NAT_MODE: any
+# none
+# Default: full
+GCMODE: full
+#HEAD
+QUORUM_VERSION: "d967b695df94d5b2b8a76f669da429d3d1b84bd2"
+#"d967b695df94d5b2b8a76f669da429d3d1b84bd2"
+BRIDGED_MODE: true
+INFLUX_USERNAME: "lrdata"
+INFLUX_PASSWORD: "password123"
+INFLUXDB_ADMIN_USER: "admin"
+INFLUXDB_ADMIN_PASSWORD: "password123"
+INFLUXDB_USER: "lrdata"
+INFLUXDB_USER_PASSWORD: "password123"
+NUMBER_OF_ACCOUNTS_PER_NODE: 100
+LIGHTKDF: true
+# Default 1
+PRICELIMIT: 1
+# Default 10
+PRICEBUMP: 10
+# Default 16
+ACCOUNTSLOTS: 65535
+# Default 5120
+GLOBALSLOTS: 65535
+# Default 64
+ACCOUNTQUEUE: 65545
+# Default 1024
+GLOBALQUEUE: 65535
+# Default 1000000000
+GASPRICE: 1000
+# Default 5s
+EVM_TIMEOUT: 0

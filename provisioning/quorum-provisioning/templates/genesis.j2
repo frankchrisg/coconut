@@ -1,0 +1,29 @@
+{
+  "alloc": {
+{% for address in all_keys.results %}
+"{{ address.item }}": {
+  "balance": "{{ DEFAULT_INIT_BALANCE }}"
+}{% if not loop.last %},{% endif %}
+{% endfor %}
+},
+ "coinbase": "0x0000000000000000000000000000000000000000",
+ "config": {
+   "homesteadBlock": 0,
+   "byzantiumBlock": 0,
+   "chainId": 10,
+   "eip150Block": 0,
+   "eip155Block": 0,
+   "eip150Hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+   "eip158Block": 0,
+   "txnSizeLimit": {{ TX_SIZE_LIMIT }},
+   "maxCodeSize": 0,
+   "isQuorum": true
+  },
+ "difficulty": "0x0",
+ "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000",
+ "gasLimit": "{{ GENESIS_GAS_LIMIT }}",
+ "mixhash": "0x00000000000000000000000000000000000000647572616c65787365646c6578",
+ "nonce": "0x0",
+ "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+ "timestamp": "0x00"
+}   

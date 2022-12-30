@@ -1,0 +1,11 @@
+- import_playbook: init.yaml SERIAL_EXECUTION_PB=100 hostset=realservers
+  when: INIT is defined and INIT | bool
+- import_playbook: common.yaml SERIAL_EXECUTION_PB=100 hostset=realservers
+  when: COMMON is defined and COMMON | bool
+- import_playbook: docker-swarm.yaml SERIAL_EXECUTION_PB=1 hostset=realservers
+- import_playbook: create-node-configuration.yaml SERIAL_EXECUTION_PB=100 hostset=local
+- import_playbook: create-node-environment.yaml SERIAL_EXECUTION_PB=100 hostset=node
+- import_playbook: start-nodes.yaml SERIAL_EXECUTION_PB=100 hostset=node
+- import_playbook: restart-nodes.yaml SERIAL_EXECUTION_PB=100 hostset=node
+- import_playbook: statistics.yaml SERIAL_EXECUTION_PB=100 hostset=statistics
+- import_playbook: statistics-influxdb.yaml SERIAL_EXECUTION_PB=100 hostset=statistics

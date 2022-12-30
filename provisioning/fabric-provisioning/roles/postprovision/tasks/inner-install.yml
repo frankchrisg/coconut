@@ -1,0 +1,85 @@
+- name: Install chaincode for all peers (preparation step)
+  debug:
+    msg: >-
+      echo CORE_PEER_LOCALMSPID={{ item.id }} CORE_PEER_ADDRESS=peer{{ my_idx
+      }}.{{ item.domain }}:{{ 7000 + outer_index*100 + my_idx }}
+      CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/{{
+      item.domain }}/users/Admin@{{ item.domain }}/msp
+      CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/{{
+      item.domain }}/peers/peer{{ my_idx }}.{{ item.domain }}/tls/ca.crt
+  register: message
+  loop: "{{ range(0, certificates_config_peer[outer_index].number)|list }}"
+  loop_control:
+    loop_var: inner_item
+    index_var: my_idx
+  tags:
+  - bm-set
+
+- name: Execute go mod vendor
+  shell: >-
+    echo "cd {{ GO_MOD_VENDOR_PATH }}github.com/chaincode/{{ x_item.1.name }} && go mod vendor" |
+    docker exec -i {{ PREFERRED_CLI_CHANNEL_CREATION }} /bin/bash -
+  loop: "{{ message.results | product(chaincodes)|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: xmy_idx
+  when: "GO_MOD_VENDOR and (IMAGE_TAG.split(\".\")[0])|int == 2 and x_item[0].msg.split('/')[-3] not in peers_to_exclude_from_chaincode"
+  tags:
+  - bm-set
+
+- name: Install chaincode for all peers (completion step) for Fabric v1.x.x
+  shell: >-
+    sleep {{ DEFAULT_SLEEP_TIME }} && {{ x_item[0].msg }} peer chaincode install -l {{ x_item.1.language }} -o {{
+    PREFERRED_ORDERER_WITH_PORT_TO_CREATE_CHANNEL }} --tls --cafile
+    /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/{{
+    PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}/orderers/{{
+    PREFERRED_ORDERER_TO_CREATE_CHANNEL }}/msp/tlscacerts/tlsca.{{
+    PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}-cert.pem -n {{
+    x_item.1.name.split('/')[0] }} -v 1.0 -p {{ "/opt/gopath/src/" if x_item.1.language == 'java' else ""
+    }}github.com/chaincode/{{ x_item.1.name }} |
+    docker exec -i {{ PREFERRED_CLI_CHANNEL_CREATION }} /bin/bash -
+  loop: "{{ message.results | product(chaincodes)|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: xmy_idx
+  when: "(IMAGE_TAG.split(\".\")[0])|int == 1 and x_item[0].msg.split('/')[-3] not in peers_to_exclude_from_chaincode"
+  tags:
+  - bm-set
+  
+- name: Install chaincode for all peers (completion step) for Fabric v2.x.x
+  shell: >-
+    sleep {{ DEFAULT_SLEEP_TIME }} && {{ x_item[0].msg }} peer chaincode install -l {{ x_item.1.language }} -o {{
+    PREFERRED_ORDERER_WITH_PORT_TO_CREATE_CHANNEL }} --tls --cafile
+    /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/{{
+    PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}/orderers/{{
+    PREFERRED_ORDERER_TO_CREATE_CHANNEL }}/msp/tlscacerts/tlsca.{{
+    PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}-cert.pem -n {{
+    x_item.1.name.split('/')[0] }} -v 1.0 -p {{ "/opt/gopath/src/" if x_item.1.language == 'java' else ""
+    }}github.com/chaincode/{{ x_item.1.name }} --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/{{ x_item[0].msg.split('/')[-3] }}/tlsca/tlsca.{{ x_item[0].msg.split('/')[-3] }}-cert.pem |
+    docker exec -i {{ PREFERRED_CLI_CHANNEL_CREATION }} /bin/bash -
+  loop: "{{ message.results | product(chaincodes)|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: xmy_idx
+  when: "(IMAGE_TAG.split(\".\")[0])|int == 2 and x_item[0].msg.split('/')[-3] not in peers_to_exclude_from_chaincode"
+  tags:
+  - bm-set
+- name: Debug manual basis command install
+  debug:
+    msg: >-
+      sleep {{ DEFAULT_SLEEP_TIME }} && {{ x_item[0].msg }} peer chaincode install -l {{ x_item.1.language }} -o {{
+      PREFERRED_ORDERER_WITH_PORT_TO_CREATE_CHANNEL }} --tls --cafile
+      /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/{{
+      PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}/orderers/{{
+      PREFERRED_ORDERER_TO_CREATE_CHANNEL }}/msp/tlscacerts/tlsca.{{
+      PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}-cert.pem -n {{
+      x_item.1.name.split('/')[0] }} -v 1.0 -p {{ "/opt/gopath/src/" if x_item.1.language == 'java' else ""
+      }}github.com/chaincode/{{ x_item.1.name }} |
+      docker exec -i {{ PREFERRED_CLI_CHANNEL_CREATION }} /bin/bash -
+  loop: "{{ message.results | product(chaincodes)|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: xmy_idx
+  when: "x_item[0].msg.split('/')[-3] not in peers_to_exclude_from_chaincode"
+  tags:
+  - bm-set

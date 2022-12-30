@@ -1,0 +1,57 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Register home directory
+  shell: "echo $HOME"
+  register: homeDir
+  tags:
+  - bm-set
+- name: Echo home directory
+  debug:
+    msg: "{{ homeDir.stdout }}"
+  tags:
+  - bm-set
+- name: Register the number of nodes to start
+  debug:
+    msg: "{{ item.number }}"
+  loop: "{{ additional_nodes_per_container | flatten(levels=1) }}"
+  when: "item.name == inventory_hostname"
+  register: numberOfNodes
+  tags:
+  - bm-set
+- name: Register the sum of all nodes to start
+  debug: 
+    msg: "{{ additional_nodes_per_container | map(attribute='number') | map('int') | sum(start=0) }}"
+  register: sumOfNodes
+  tags:
+  - bm-set
+- name: Register the sum of all non-validators to start
+  debug:
+    msg: "{{ additional_nodes_per_container | map(attribute='additional_non_validators') | map('int') | sum(start=0) }}"
+  register: sumOfAdditionalNonValidatorNodes
+  tags:
+  - bm-set
+- name: Register the number of nodes to start step 2
+  debug:
+    msg: "{{ item.msg }}"
+  loop: "{{ numberOfNodes.results }}"
+  when: item.msg is defined and item.msg | int > 0
+  register: numberOfNodesPlain
+  tags:
+  - bm-set
+- name: Register the number of non-validator nodes to start
+  debug:
+    msg: "{{ item.additional_non_validators }}"
+  loop: "{{ additional_nodes_per_container | flatten(levels=1) }}"
+  when: "item.name == inventory_hostname"
+  register: numberOfNodesNonValidator
+  tags:
+  - bm-set
+- name: Register the number of non validators nodes to start step 2
+  debug:
+    msg: "{{ item.msg }}"
+  loop: "{{ numberOfNodesNonValidator.results }}"
+  when: item.msg is defined and item.msg | int > 0
+  register: numberOfNodesPlainNonValidator
+  tags:
+  - bm-set

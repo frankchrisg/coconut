@@ -1,0 +1,38 @@
+127.0.0.1	localhost
+
+# The following lines are desirable for IPv6 capable hosts
+::1     ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+
+192.168.178.42 zookeeper0.zookeeper.com
+192.168.178.42 zookeeper1.zookeeper.com
+192.168.178.42 zookeeper2.zookeeper.com
+192.168.178.42 kafka0.kafka.com
+192.168.178.42 kafka1.kafka.com
+192.168.178.42 kafka2.kafka.com
+192.168.178.42 kafka3.kafka.com
+192.168.178.42 orderer0.ordererone.com
+192.168.178.42 orderer1.ordererone.com
+192.168.178.42 orderer2.ordererone.com
+192.168.178.42 orderer3.ordererone.com
+192.168.178.42 orderer4.ordererone.com
+192.168.178.42 orderer0.orderertwo.com
+192.168.178.42 orderer1.orderertwo.com
+192.168.178.42 orderer2.orderertwo.com
+192.168.178.42 orderer3.orderertwo.com
+192.168.178.42 orderer4.orderertwo.com
+192.168.178.42 orderer5.orderertwo.com
+192.168.178.42 ca.peerone.com
+192.168.178.42 ca.peertwo.com
+192.168.178.42 peer0.peerone.com
+192.168.178.42 couchdb0.peerone.com
+192.168.178.42 peer1.peerone.com
+192.168.178.42 couchdb1.peerone.com
+192.168.178.42 peer0.peertwo.com
+192.168.178.42 couchdb0.peertwo.com
+192.168.178.42 peer1.peertwo.com
+192.168.178.42 couchdb1.peertwo.com
+

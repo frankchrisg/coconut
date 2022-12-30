@@ -1,0 +1,59 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Create CLI configuration files
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/cli.j2"
+    dest: >-
+      {{ MAIN_CONFIG_PATH }}/cli_configs/cli.{{ item[0].1.path.split('/')[-1]
+      }}.yaml
+  loop: >-
+    {{
+    items.results|map(attribute='files')|sum(start=[])|map(attribute='path')|list|zip(dir.files)|list|product(certificates_config_peer)|list
+    }}
+  when: "item[0].1.path.split('/')[-1] == item[1].domain"
+  loop_control:
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Find files on remote machine
+  find:
+    paths: "{{ MAIN_CONFIG_PATH }}/cli_configs"
+    patterns: "*.yaml"
+  register: output
+  tags:
+  - bm-set
+
+- name: remove container
+  docker_container:
+    name: "cli.{{ item[0].1.path.split('/')[-1] }}"
+    keep_volumes: false
+    state: absent
+    #force_kill: yes
+  loop: >-
+    {{
+    items.results|map(attribute='files')|sum(start=[])|map(attribute='path')|list|zip(dir.files)|list|product(certificates_config_peer)|list
+    }}
+  tags:
+  - bm-set
+
+- name: Stop cli containers
+  docker_compose:
+    project_src: "{{ MAIN_CONFIG_PATH }}/cli_configs"
+    files: "{{ item.path | basename }}"
+    remove_volumes: yes
+    state: absent
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-rem
+
+- name: Run cli containers
+  docker_compose:
+    project_src: "{{ MAIN_CONFIG_PATH }}/cli_configs"
+    files: "{{ item.path | basename }}"
+    recreate: always
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-run

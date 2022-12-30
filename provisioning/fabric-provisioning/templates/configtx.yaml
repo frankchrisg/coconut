@@ -1,0 +1,217 @@
+# This file represents an example configuration and should not be used in productions environments
+#
+# This configuration file is used on the present scenario. It is used to create genesis blocks which are following a specific structure
+#
+# In order to prevent any failures it is not advised to change the variables without further knowledge
+# For further information on this configuration file and the belonging binary, please see: https://hyperledger-fabric.readthedocs.io/en/latest/commands/configtxgen.html
+
+# Capabilities are not part of the present scenario. Adjust as necessary
+# For further information on capabilities please see: https://hyperledger-fabric.readthedocs.io/en/latest/capability_requirements.html
+Capabilities:
+    Global: &ChannelCapabilities
+        V1_1: true
+    Orderer: &OrdererCapabilities
+        V1_1: true
+    Application: &ApplicationCapabilities
+        V1_1: true
+
+Orderer: &OrdererDefaults
+
+    OrdererType: "etcdraft"
+
+    Addresses:
+            - orderer0.ordererone.com:27000
+            - orderer1.ordererone.com:27001
+            - orderer2.ordererone.com:27002
+
+    # The amount of time to wait before a batch is created
+    BatchTimeout: "1s"
+
+    BatchSize:
+        # The maximum number of messages in a batch
+        MaxMessageCount: 1000
+
+        # The absolute maximum number of bytes allowed
+        # for the serialized messages in a batch
+        AbsoluteMaxBytes: "1 GB"
+
+        # The preferred number of maximum bytes allowed
+        # for the serialized messages in a batch. As the name states, this is only a preferred value
+        # so there isn't any guarantee this value can always be chosen
+        PreferredMaxBytes: "1 GB"
+
+    # The maximum number of channels which can be created
+    MaxChannels: 0
+
+    EtcdRaft:
+        Consenters:  
+            - Host: orderer0.ordererone.com
+              Port: 27000
+              ClientTLSCert: /home/parallels/FINAL_graphene_corda_latest_xxx/binaries_provision/crypto-config/ordererOrganizations/ordererone.com/orderers/orderer0.ordererone.com/tls/server.crt
+              ServerTLSCert: /home/parallels/FINAL_graphene_corda_latest_xxx/binaries_provision/crypto-config/ordererOrganizations/ordererone.com/orderers/orderer0.ordererone.com/tls/server.crt  
+            - Host: orderer1.ordererone.com
+              Port: 27001
+              ClientTLSCert: /home/parallels/FINAL_graphene_corda_latest_xxx/binaries_provision/crypto-config/ordererOrganizations/ordererone.com/orderers/orderer1.ordererone.com/tls/server.crt
+              ServerTLSCert: /home/parallels/FINAL_graphene_corda_latest_xxx/binaries_provision/crypto-config/ordererOrganizations/ordererone.com/orderers/orderer1.ordererone.com/tls/server.crt  
+            - Host: orderer2.ordererone.com
+              Port: 27002
+              ClientTLSCert: /home/parallels/FINAL_graphene_corda_latest_xxx/binaries_provision/crypto-config/ordererOrganizations/ordererone.com/orderers/orderer2.ordererone.com/tls/server.crt
+              ServerTLSCert: /home/parallels/FINAL_graphene_corda_latest_xxx/binaries_provision/crypto-config/ordererOrganizations/ordererone.com/orderers/orderer2.ordererone.com/tls/server.crt 
+        Options:
+            TickInterval: 500ms
+            ElectionTick: 10
+            HeartbeatTick: 1
+            MaxInflightBlocks: 10
+            SnapshotIntervalSize: 16 MB
+
+    # In the current scenario Apache Kafka brokers in addition with Apache ZooKeeper should be used. The orderer will connect to those Apache Kafka brokers
+    Kafka:
+        Brokers:
+            - kafka0.kafka.com:37000
+            - kafka1.kafka.com:37001
+            - kafka2.kafka.com:37002
+
+    Organizations:
+
+      OrdererEndpoints:
+              - orderer0.ordererone.com:27000
+              - orderer1.ordererone.com:27001
+              - orderer2.ordererone.com:27002
+      
+    # Policies are not a relevant part of the present scenario
+    Policies:
+        Readers:
+            Type: ImplicitMeta
+            Rule: "ANY Readers"
+        Writers:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+        Admins:
+            Type: ImplicitMeta
+            Rule: "ANY Admins"
+        BlockValidation:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+
+Organizations:
+
+    - &Org1
+        Name: Organization1
+        ID: Org1
+        MSPDir: /home/parallels/FINAL_graphene_corda_latest_xxx/binaries_provision/crypto-config/peerOrganizations/peerone.com/msp
+        AdminPrincipal: Role.ADMIN
+        Anchorpeers:
+        # For further information on anchor peers, please see: https://hyperledger-fabric.readthedocs.io/en/release-1.2/glossary.html#anchor-peer
+            - Host: peer0.peerone.com
+              Port: 7000
+
+        # Policies are not a relevant part of the present scenario
+        Policies:
+            Readers:
+                Type: ImplicitMeta
+                Rule: "ANY Readers"
+            Writers:
+                Type: ImplicitMeta
+                Rule: "ANY Writers"
+            Admins:
+                Type: ImplicitMeta
+                Rule: "ANY Admins"
+            BlockValidation:
+                Type: ImplicitMeta
+                Rule: "ANY Writers"
+    - &Orderer
+        Name: OrdererOrg
+        ID: Orderer
+        MSPDir: /home/parallels/FINAL_graphene_corda_latest_xxx/binaries_provision/crypto-config/ordererOrganizations/ordererone.com/msp
+        AdminPrincipal: Role.ADMIN
+#        Leftover of a previous Hyperledger Fabric bug. It was required to set a (dummy) peer for every organization otherwise it was not possible to create the genesis block
+#        Anchorpeers:
+#            - Host: 127.0.0.1
+#              Port: 7051
+
+        # Policies are not a relevant part of the present scenario
+        Policies:
+            Readers:
+                Type: ImplicitMeta
+                Rule: "ANY Readers"
+            Writers:
+                Type: ImplicitMeta
+                Rule: "ANY Writers"
+            Admins:
+                Type: ImplicitMeta
+                Rule: "ANY Admins"
+            BlockValidation:
+                Type: ImplicitMeta
+                Rule: "ANY Writers"
+
+Application: &ApplicationDefaults
+
+    Organizations:
+
+    # Policies are not a relevant part of the present scenario
+    Policies:
+        Readers:
+            Type: ImplicitMeta
+            Rule: "ANY Readers"
+        Writers:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+        Admins:
+            Type: ImplicitMeta
+            Rule: "ANY Admins"
+        BlockValidation:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+
+Profiles:
+    OrdererGenesis:
+        Capabilities:
+            <<: *ChannelCapabilities
+        Orderer:
+            <<: *OrdererDefaults
+            Organizations:
+                - *Orderer
+            Capabilities:
+                <<: *OrdererCapabilities
+        Consortiums:
+            Consortium:
+                Organizations:
+                - *Org1
+        # Policies are not a relevant part of the present scenario
+        Policies:
+            Readers:
+                Type: ImplicitMeta
+                Rule: "ANY Readers"
+            Writers:
+                Type: ImplicitMeta
+                Rule: "ANY Writers"
+            Admins:
+                Type: ImplicitMeta
+                Rule: "ANY Admins"
+            BlockValidation:
+                Type: ImplicitMeta
+                Rule: "ANY Writers"
+
+    OrganizationsChannel:
+        Consortium: Consortium
+        Application:
+            <<: *ApplicationDefaults
+            Organizations:
+                - *Org1
+            Capabilities:
+                <<: *ApplicationCapabilities
+                
+        Policies:
+            Readers:
+                Type: ImplicitMeta
+                Rule: "ANY Readers"
+            Writers:
+                Type: ImplicitMeta
+                Rule: "ANY Writers"
+            Admins:
+                Type: ImplicitMeta
+                Rule: "ANY Admins"
+            BlockValidation:
+                Type: ImplicitMeta
+                Rule: "ANY Writers"
+

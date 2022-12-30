@@ -1,0 +1,31 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Get CA
+  shell: "$(which sshpass) -p {{ SSH_PASSWORD_CLI }} ssh -o StrictHostKeyChecking=no {{ SSH_USER_CLI }}@{{ SSH_HOST_CLI }} 'docker exec --interactive {{ CLI_NAME }} bash -c \"find ./crypto/*/*/tlsca/ -type f -name tlsca.*.pem | xargs cat\"'"
+  register: ca
+  delegate_to: localhost
+  tags:
+  - bm-set
+- name: Get orderer CA
+  shell: "$(which sshpass) -p {{ SSH_PASSWORD_CLI }} ssh -o StrictHostKeyChecking=no {{ SSH_USER_CLI }}@{{ SSH_HOST_CLI }} 'docker exec --interactive {{ CLI_NAME }} bash -c \"find ./crypto/ordererOrganizations/*/*/*/*/signcerts/ -type f -print -exec cat {} \\;\"'"
+  delegate_to: localhost
+  register: orderer_ca
+  tags:
+  - bm-set
+- name: Write ca file
+  local_action: 
+    module: copy 
+    content: "{{ ca.stdout }}"
+    dest: "{{ FABRIC_CA_LOCATION }}"
+  throttle: 1
+  tags:
+  - bm-set
+- name: Write orderer ca file
+  local_action: 
+    module: copy 
+    content: "{{ orderer_ca.stdout }}"
+    dest: "{{ FABRIC_ORDERER_CA_LOCATION }}"
+  throttle: 1
+  tags:
+  - bm-set

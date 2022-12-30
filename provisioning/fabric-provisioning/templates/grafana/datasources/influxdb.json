@@ -1,0 +1,10 @@
+{
+  "name":"metrics",
+  "type":"influxdb",
+  "url":"http://influxdb:8086",
+  "access":"proxy",
+  "database":"metrics",
+  "user":"lrdata",
+  "password":"lrdata",
+  "basicauth":false
+}

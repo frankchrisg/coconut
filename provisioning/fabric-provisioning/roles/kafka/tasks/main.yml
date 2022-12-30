@@ -1,0 +1,7 @@
+- name: Pull Kafka image
+  docker_image:
+    name: "hyperledger/fabric-kafka:{{ THIRDPARTY }}"
+    tag: "fabric-kafka"
+  tags:
+  - bm-set
+- import_tasks: provide-kafka.yaml

@@ -1,0 +1,56 @@
+version: "2"
+
+volumes:
+  {{ item }}:
+
+#networks:
+#  {{ NET_NAME }}:
+
+{% if BRIDGED_MODE -%}
+networks:
+  sawtooth:
+{% endif %}
+
+services:
+  {{ item }}:
+    container_name: {{ item }}
+    image: {{ DOCKERFILE_NAME }}
+    {% if BRIDGED_MODE -%}
+    network_mode: "bridge"
+    ports:
+      - {{ REST_API_START_PORT + my_idx }}:{{ REST_API_START_PORT + my_idx }}
+      - {{ VALIDATOR_START_PORT + my_idx }}:{{ VALIDATOR_START_PORT + my_idx }}
+      - {{ ENDPOINT_START_PORT + my_idx }}:{{ ENDPOINT_START_PORT + my_idx }}
+      - {{ CONSENSUS_START_PORT + my_idx }}:{{ CONSENSUS_START_PORT + my_idx }}
+    {% else -%}
+    network_mode: "host"
+    {% endif %}
+    
+    restart: always
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+    #    ports:
+    #      - "{{ 8800 + my_idx }}:7054"
+    tty: true
+    #command: tail -f /dev/null
+    volumes:
+      - {{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item }}/{{ item }}_log.toml:/etc/sawtooth/log_config.toml
+      - {{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item }}/{{ item }}_cli.toml:/etc/sawtooth/cli.toml
+      - {{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item }}/{{ item }}_rest.toml:/etc/sawtooth/rest_api.toml
+      - {{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item }}/{{ item }}_validator.toml:/etc/sawtooth/validator.toml
+      - /etc/timezone:/etc/timezone
+      - /etc/security/limits.conf:/etc/security/limits.conf
+      - /etc/sysctl.conf:/etc/sysctl.conf
+      - /var/log/tp_logs:/tp_logs
+      - {{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item }}/{{ item }}_sawtooth-identity-tp:/etc/default/sawtooth-identity-tp
+      - {{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item }}/{{ item }}_sawtooth-intkey-tp-python:/etc/default/sawtooth-intkey-tp-python
+      - {{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item }}/{{ item }}_sawtooth-xo-tp-python:/etc/default/sawtooth-xo-tp-python
+      - {{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item }}/{{ item }}_sawtooth-pbft-engine:/etc/default/sawtooth-pbft-engine
+      - {{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item }}/{{ item }}_sawtooth-poet-engine:/etc/default/sawtooth-poet-engine
+      - {{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item }}/{{ item }}_sawtooth-poet-validator-registry-tp:/etc/default/sawtooth-poet-validator-registry-tp
+      - {{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item }}/{{ item }}_sawtooth-raft-engine:/etc/default/sawtooth-raft-engine
+      - {{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item }}/{{ item }}_sawtooth-settings-tp:/etc/default/sawtooth-settings-tp
+      - {{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item }}/{{ item }}_sawtooth-rest-api:/etc/default/sawtooth-rest-api
+      - {{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item }}/{{ item }}_telegraf.conf:/etc/telegraf/telegraf.conf
+    cap_add:
+      - SYS_PTRACE

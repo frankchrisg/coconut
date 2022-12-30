@@ -1,0 +1,4 @@
+- name: "Execute script"
+  shell: '$(which bash) {{ CLIENT_PATH }}/{{ inventory_hostname }}/replaceValue.sh "=" "?" "{{ CLIENT_PATH }}/{{inventory_hostname}}/configs/{{ outer_item.key }}" "{{ CLIENT_PATH }}/{{inventory_hostname}}/configs/{{ outer_item.key }}" "{{ (outer_item2 | dict2items).0.key }}" "{{ (outer_item2 | dict2items).0.value }}"'
+  tags:
+  - bm-set

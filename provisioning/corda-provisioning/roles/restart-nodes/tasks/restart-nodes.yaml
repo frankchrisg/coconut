@@ -1,0 +1,6 @@
+- name: Restart node
+  shell: "echo 'apt update && apt install -y psmisc && $(which killall) -9 java && sleep {{ NODE_START_TIME }} && /bin/bash {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/{{ inventory_hostname }}-start-node.sh' | docker exec -iw {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }} {{ inventory_hostname }} /bin/bash -"
+  when: RESTART_NODES
+  # ENABLE_RAFT and hostvars[inventory_hostname]['raftClusterMember'] is defined and hostvars[inventory_hostname]['raftClusterMember'] | bool
+  tags:
+  - bm-set

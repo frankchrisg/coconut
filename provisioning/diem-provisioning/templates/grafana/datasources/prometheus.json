@@ -1,0 +1,11 @@
+{
+  "name": "prometheus_diem",
+  "type": "prometheus",
+  "isDefault": true,
+  "access": "direct",
+  "url": "http://localhost:9090",
+  "basicAuth": true,
+  "basicAuthUser": "username",
+  "basicAuthPassword": "password"
+}
+

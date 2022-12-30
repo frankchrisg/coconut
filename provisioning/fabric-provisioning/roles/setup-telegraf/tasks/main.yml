@@ -1,0 +1,42 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Register container id
+  shell: docker exec -i {% if hostset=="couchdb" and ENABLE_COUCHDB %}{{ inventory_hostname | regex_replace("^(peer)", "couchdb") }}{% else %}{{ inventory_hostname }}{% endif %} cat /proc/self/cgroup | grep "memory:/" | sed 's/\([0-9]\):memory:\/docker\///g'
+  register: container_id
+  tags:
+  - bm-set
+- name: Execute telegraf script
+  shell: 'echo "cp /etc/telegraf/telegraf.conf /etc/telegraf/telegraf.conf_mod && sed -i \"s/HOSTNAME_TO_REPLACE/{{ container_id.stdout }}/g\" /etc/telegraf/telegraf.conf_mod" | docker exec -i {% if hostset=="couchdb" and ENABLE_COUCHDB %}{{ inventory_hostname | regex_replace("^(peer)", "couchdb") }}{% else %}{{ inventory_hostname }}{% endif %} /bin/sh'
+  tags:
+  - bm-set
+
+- name: Prepare telegraf script
+  shell: "echo \"echo -e 'apk add --no-cache --virtual .build-deps || true\n
+  apk add bash gcc musl-dev openssl make go gcc linux-headers git || true\n
+  apt-get install bash gcc musl-dev openssl make golang gcc git || true\n
+  wget -O go.tgz https://dl.google.com/go/go1.15.2.src.tar.gz\n
+  tar -C /usr/local -xzf go.tgz\n
+  cd /usr/local/go/src/\n
+  ./make.bash\n
+  export PATH=\"/usr/local/go/bin:\\$PATH\"\n
+  export GOPATH=/opt/go/\n
+  export PATH=\\$PATH:\\$GOPATH/bin\n
+  apk del .build-deps || true\n
+  go version\n
+  git clone https://github.com/influxdata/telegraf.git /etc/telegraf\n
+  cd /etc/telegraf\n
+  make' > /telegraf.sh\" | docker exec -i {% if hostset==\"couchdb\" and ENABLE_COUCHDB %}{{ inventory_hostname | regex_replace(\"^(peer)\", \"couchdb\") }}{% else %}{{ inventory_hostname }}{% endif %} /bin/sh"
+  when: BUILD_TELEGRAF
+  tags:
+  - bm-set
+- name: Execute telegraf script
+  shell: 'echo "sh /telegraf.sh && /etc/telegraf/telegraf -config /etc/telegraf/telegraf.conf_mod >> /telegraf.log 2>&1 &" | docker exec -i {% if hostset=="couchdb" and ENABLE_COUCHDB %}{{ inventory_hostname | regex_replace("^(peer)", "couchdb") }}{% else %}{{ inventory_hostname }}{% endif %} /bin/sh'
+  when: BUILD_TELEGRAF
+  tags:
+  - bm-set
+- name: Execute telegraf script
+  shell: 'echo "apk add --no-cache libc6-compat || true && /bin/telegraf -config /etc/telegraf/telegraf.conf_mod >> /telegraf.log 2>&1 &" | docker exec -i {% if hostset=="couchdb" and ENABLE_COUCHDB %}{{ inventory_hostname | regex_replace("^(peer)", "couchdb") }}{% else %}{{ inventory_hostname }}{% endif %} /bin/sh'
+  when: not BUILD_TELEGRAF
+  tags:
+  - bm-set

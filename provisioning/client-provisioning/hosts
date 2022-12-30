@@ -1,0 +1,35 @@
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
+ansible_port=22
+ansible_user=parallels
+ansible_become_user=root
+ansible_ssh_pass=password123
+ansible_become_pass=password123
+
+[statistics]
+192.168.178.22
+
+[local]
+localhost ansible_connection=local
+
+[client]
+client-10000000-0-0-24-0-0-14999 serverip=135.181.221.204 cpu_cores=0-7
+client-20000000-1-25-49-1-15000-29999 serverip=135.181.216.228 cpu_cores=0-7
+client-30000000-2-50-74-2-30000-44999 serverip=135.181.221.204 cpu_cores=8-15
+client-40000000-3-75-99-3-45000-59999 serverip=135.181.216.228 cpu_cores=8-15
+#                          30000-44999
+#                          45000-59999
+##client-20000000-1-25-49-1 serverip=10.10.10.4 cpu_cores=0-7
+##client-30000000-2-50-74-2 serverip=10.10.10.3 cpu_cores=8-15
+##client-40000000-3-75-99-3 serverip=10.10.10.4 cpu_cores=8-15
+#clienty serverip=192.168.2.105
+# client[0:9] serverip=192.168.2.103
+# client[10:19] serverip=192.168.2.105
+
+[realservers]
+localhost executor_main=true
+135.181.221.204 telegraf=true
+135.181.216.228 telegraf=true
+#10.28.55.240
+#10.10.10.3
+#10.10.10.4

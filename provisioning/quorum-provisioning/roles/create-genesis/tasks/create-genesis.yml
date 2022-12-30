@@ -1,0 +1,22 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Register all keys
+  debug:
+    msg: "{{ item }}"
+  with_lines: "{% if CONSENSUS_NAME == \"raft\" %} cat {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/enodes_local.json {% else %}echo \"\"{% endif %}"
+  register: all_keys
+  tags:
+  - bm-set
+- name: Create genesis file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/genesis.j2"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/genesis.json" 
+  when: CONSENSUS_NAME == "raft"
+  tags:
+  - bm-set
+- name: Add last comma to static-nodes.json
+  local_action: replace path="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes.json" replace=',\n]' regexp='\n]'
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set

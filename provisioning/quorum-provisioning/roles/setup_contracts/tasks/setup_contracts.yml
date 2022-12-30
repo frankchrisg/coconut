@@ -1,0 +1,73 @@
+- name: Get address for contract deployment
+#  shell: "echo '{{ BUILD_PATH }}/geth attach {{ PREFERRED_CONTRACT_NODE_DIR }}/geth.ipc<<< exit | grep coinbase | awk '\"'\"'{split($0,a,\" \"); print a[2]}'\"'\"'' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  shell: "echo '{{ BUILD_PATH }}/geth attach {{ PREFERRED_CONTRACT_NODE_DIR }}/geth.ipc<<< \"console.log(\\\"grepPrefix\\\" + personal.listAccounts[0])\" | grep \"grepPrefix\" | sed \"s/grepPrefix//\"' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  register: address
+  when: "inventory_hostname == PREFERRED_CONTRACT_NODE"
+  tags:
+  - bm-set
+- name: Create contract deployment script
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/contract-deploy.j2"
+    dest: >-
+      {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/contract-deploy-{{ x_item.name }}.js
+  loop: "{{ contracts|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: my_idx
+  when: "inventory_hostname == PREFERRED_CONTRACT_NODE"
+  tags:
+  - bm-set
+- name: Copy contract deployment script to container
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/contract-deploy-{{ x_item.name }}.js {{ inventory_hostname }}:/contract-deploy-{{ x_item.name }}.js"
+  loop: "{{ contracts|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: my_idx
+  when: "inventory_hostname == PREFERRED_CONTRACT_NODE"
+  tags:
+  - bm-set
+
+- name: Create contract deployment script
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/smart-contract.j2"
+    dest: >-
+      {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/smart-contract.expect
+  tags:
+  - bm-set
+- name: Copy contract deployment script to container
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/smart-contract.expect {{ inventory_hostname }}:/smart-contract.expect"
+  tags:
+  - bm-set
+- name: Load contract script
+#  shell: "echo '{{ BUILD_PATH }}/geth attach {{ PREFERRED_CONTRACT_NODE_DIR }}/geth.ipc<<< loadScript\\(\\\"contract-deploy-{{ x_item.name }}.js\\\"\\) | grep CTAddress | awk '\"'\"'{split($0,a,\" \"); print a[2]}'\"'\"'' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  shell: "echo '$(which expect) smart-contract.expect contract-deploy-{{ x_item.name }}.js | grep CTAddress | awk '\"'\"'{split($0,a,\" \"); print a[3]}'\"'\"'' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  loop: "{{ contracts|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: my_idx
+  register: contract_addresses
+  when: "inventory_hostname == PREFERRED_CONTRACT_NODE"
+  tags:
+  - bm-set
+- name: Contract addresses
+  debug:
+    msg: "{{ x_item.stdout }}"
+  loop: "{{ contract_addresses.results|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: my_idx
+  register: addresses_to_write
+  when: "inventory_hostname == PREFERRED_CONTRACT_NODE"
+  tags:
+  - bm-set
+- name: Write contract addresses to local file
+  local_action: shell echo "{{ contract_addresses.results[my_idx].stdout }} | {{ contracts[my_idx].name }} " >> {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/contract_addresses.txt
+  loop: "{{ addresses_to_write.results|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: my_idx
+  when: "inventory_hostname == PREFERRED_CONTRACT_NODE"
+  throttle: 1
+  tags:
+  - bm-set
+

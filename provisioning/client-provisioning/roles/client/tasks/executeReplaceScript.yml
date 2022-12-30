@@ -1,0 +1,7 @@
+- include_tasks: inner-executeReplaceScript.yml
+  loop: "{{ outer_item.value | default([], true) }}"
+  loop_control:
+    loop_var: outer_item2
+    index_var: outer_index2
+  tags:
+  - bm-set

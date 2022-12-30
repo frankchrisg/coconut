@@ -1,0 +1,70 @@
+version: '2'
+
+volumes:
+  {{ item }}:
+
+#networks:
+#  {{ NET_NAME }}:
+
+{% if BRIDGED_MODE -%}
+networks:
+  fabric:
+{% endif %}
+
+services:
+  {{ item }}:
+    image: hyperledger/fabric-kafka
+    {% if BRIDGED_MODE -%}
+    network_mode: "bridge"
+    ports:
+      - {{ KAFKA_START_PORT + groups['kafka'].index(inventory_hostname) }}:{{ KAFKA_START_PORT + groups['kafka'].index(inventory_hostname) }}
+#     - {{ KAFKA_START_PORT + my_idx }}:{{ KAFKA_START_PORT + my_idx }}
+      - {{ 33000 + groups['kafka'].index(inventory_hostname) }}:{{ 33000 + groups['kafka'].index(inventory_hostname) }}
+#      - {{ 33000 + my_idx }}:{{ 33000 + my_idx }}
+    extra_hosts:
+    {% for host in groups['zookeeper'] -%}
+     - "{{ host }}:{{ hostvars[host]['serverip'] }}"
+    {% endfor -%}
+    {% for host in groups['kafka'] -%}
+     - "{{ host }}:{{ hostvars[host]['serverip'] }}"
+    {% endfor -%}
+    {% else -%}
+    network_mode: "host"
+    {% endif %}
+
+    container_name: {{ item }}
+    restart: always
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+      - KAFKA_BROKER_ID={{ 100 + groups['kafka'].index(inventory_hostname) }}
+#      - KAFKA_BROKER_ID={{ 100 + my_idx }}
+      - KAFKA_ADVERTISED_PORT={{ KAFKA_START_PORT + groups['kafka'].index(inventory_hostname) }}
+#      - KAFKA_ADVERTISED_PORT={{ KAFKA_START_PORT + my_idx }}
+      - KAFKA_ADVERTISED_HOST_NAME=kafka{{ groups['kafka'].index(inventory_hostname) }}.kafka.com
+#      - KAFKA_ADVERTISED_HOST_NAME=kafka{{ my_idx }}.kafka.com
+      - KAFKA_HOST_NAME={{ item }}
+      - KAFKA_ZOOKEEPER_CONNECT={% for host in groups['zookeeper'] %}{{ hostvars[host]['inventory_hostname'] }}:{{ 2200 + loop.index0 }}{{ "," if not loop.last else "\n" }}{% endfor %}
+      - KAFKA_LISTENERS=EXTERNAL://0.0.0.0:{{ KAFKA_START_PORT + groups['kafka'].index(inventory_hostname) }},REPLICATION://0.0.0.0:{{ 33000 + groups['kafka'].index(inventory_hostname) }}
+#      - KAFKA_LISTENERS=EXTERNAL://0.0.0.0:{{ KAFKA_START_PORT + my_idx }},REPLICATION://0.0.0.0:{{ 33000 + my_idx }}
+      - KAFKA_ADVERTISED_LISTENERS=EXTERNAL://kafka{{ groups['kafka'].index(inventory_hostname) }}.kafka.com:{{ KAFKA_START_PORT + groups['kafka'].index(inventory_hostname) }},REPLICATION://{{ item }}:{{ 33000 + groups['kafka'].index(inventory_hostname) }}
+#      - KAFKA_ADVERTISED_LISTENERS=EXTERNAL://kafka{{ my_idx }}.kafka.com:{{ KAFKA_START_PORT + my_idx }},REPLICATION://{{ item }}:{{ 33000 + my_idx }}
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=EXTERNAL:PLAINTEXT,REPLICATION:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=REPLICATION
+      - KAFKA_MESSAGE_MAX_BYTES=103809024
+      - KAFKA_REPLICA_FETCH_MAX_BYTES=103809024
+      - KAFKA_UNCLEAN_LEADER_ELECTION_ENABLE=false
+      - KAFKA_DEFAULT_REPLICATION_FACTOR=3
+      - KAFKA_MIN_INSYNC_REPLICAS=2
+    volumes:
+    - /etc/timezone:/etc/timezone
+    - /etc/security/limits.conf:/etc/security/limits.conf
+    - /etc/sysctl.conf:/etc/sysctl.conf
+    {% if not BUILD_TELEGRAF -%}
+    - {{ MAIN_CONFIG_PATH }}/telegraf/usr/bin/telegraf:/bin/telegraf
+    {% endif -%}
+    - {{ MAIN_CONFIG_PATH }}/kafka_configs/telegraf_kafka{{ groups['kafka'].index(inventory_hostname) }}.kafka.com.conf:/etc/telegraf/telegraf.conf
+#    - {{ MAIN_CONFIG_PATH }}/kafka_configs/telegraf_kafka{{ my_idx }}.kafka.com.conf:/etc/telegraf/telegraf.conf
+    - /var/lib/docker:/var/lib/docker
+#    ports:
+#      - {{ KAFKA_START_PORT + groups['kafka'].index(inventory_hostname) }}:9092
+#      - {{ KAFKA_START_PORT + my_idx }}:9092

@@ -1,0 +1,104 @@
+- name: Debug - show public keys of the validators to use for consensus processing
+  debug:
+    msg: "{{ hostvars.localhost.public_keys.results[0].item | replace ('\n',',') }}"
+  tags:
+  - bm-set
+- name: Create directory
+  shell: "echo 'mkdir -p /var/lib/sawtooth && chown -R sawtooth:sawtooth /var/lib/sawtooth && chmod 777 /var/lib/sawtooth' | docker exec -i {{ inventory_hostname }} /bin/bash -"  
+  tags:
+  - bm-set
+- name: Set permissions
+  shell: "echo 'chown -R root:sawtooth /etc/sawtooth && chown -R root:sawtooth /var/log/sawtooth && chmod 664 -R /var/log/sawtooth && chmod 775 /var/log/sawtooth/' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  tags:
+  - bm-set
+- name: Create genesis block
+  shell: "echo 'sawset genesis --key \"$HOME\"/.sawtooth/keys/sawtooth_key.priv -o config-genesis.batch' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: hostvars[inventory_hostname]['consensuscreator'] is defined and hostvars[inventory_hostname]['consensuscreator'] | bool
+  tags:
+  - bm-set
+- name: Set consensus command
+  set_fact:
+    consensus_command: 
+      "{% if CONSENSUS_NAME =='pbft' %}
+      #!/bin/bash\nsawset proposal create --key \"$HOME\"/.sawtooth/keys/sawtooth_key.priv -o config-consensus.batch sawtooth.consensus.algorithm.name={{ CONSENSUS_NAME }} sawtooth.consensus.algorithm.version={{ CONSENSUS_VERSION }} sawtooth.consensus.pbft.members='[{{ hostvars.localhost.public_keys.results[0].item | replace ('\n',',') }}]'\n
+      sawset proposal create --key \"$HOME\"/.sawtooth/keys/sawtooth_key.priv -o pbft-settings.batch {{ SAWTOOTH_SETTINGS_PBFT }}
+      {% elif CONSENSUS_NAME =='poet' %}
+      #!/bin/bash\nsawset proposal create --key \"$HOME\"/.sawtooth/keys/sawtooth_key.priv -o config-consensus.batch sawtooth.consensus.algorithm.name={{ CONSENSUS_NAME }} sawtooth.consensus.algorithm.version={{ CONSENSUS_VERSION }} sawtooth.poet.report_public_key_pem=\"$(cat /etc/sawtooth/simulator_rk_pub.pem)\" sawtooth.poet.valid_enclave_measurements=\"$(poet enclave measurement)\" sawtooth.poet.valid_enclave_basenames=\"$(poet enclave basename)\"\n
+      sawset proposal create --key \"$HOME\"/.sawtooth/keys/sawtooth_key.priv -o poet-settings.batch {{ SAWTOOTH_SETTINGS_POET }}
+      {% elif CONSENSUS_NAME =='raft' %}
+      #!/bin/bash\nsawset proposal create --key \"$HOME\"/.sawtooth/keys/sawtooth_key.priv -o config-consensus.batch sawtooth.consensus.algorithm.name={{ CONSENSUS_NAME }} sawtooth.consensus.algorithm.version={{ CONSENSUS_VERSION }} sawtooth.consensus.raft.peers='[{{ hostvars.localhost.public_keys.results[0].item | replace ('\n',',') }}]'\n
+      sawset proposal create --key \"$HOME\"/.sawtooth/keys/sawtooth_key.priv -o raft-settings.batch {{ SAWTOOTH_SETTINGS_RAFT }}
+      {% else %}{% endif %}"
+  tags:
+  - bm-set
+- name: Output consensus command
+  debug:
+    msg: "{{ consensus_command }} consensus command"
+- name: Create command to execute in container
+  copy: 
+    content: "{{ consensus_command }}"
+    dest: "{{ MAIN_CONFIG_PATH }}/consensus.sh"
+    mode: 0755
+  tags:
+  - bm-set
+- name: Copy execution file to container 
+  shell: "docker cp {{ MAIN_CONFIG_PATH }}/consensus.sh {{ inventory_hostname }}:/"
+  when: hostvars[inventory_hostname]['consensuscreator'] is defined and hostvars[inventory_hostname]['consensuscreator'] | bool and (CONSENSUS_NAME == "pbft" or CONSENSUS_NAME == "poet" or CONSENSUS_NAME == "raft")
+  tags:
+  - bm-set
+- name: Consensus proposal instantiation
+  shell: "docker exec -i {{ inventory_hostname }} /bin/bash consensus.sh -"
+  when: hostvars[inventory_hostname]['consensuscreator'] is defined and hostvars[inventory_hostname]['consensuscreator'] | bool and (CONSENSUS_NAME == "pbft" or CONSENSUS_NAME == "poet" or CONSENSUS_NAME == "raft")
+  tags:
+  - bm-set
+- name: Finish consensus instantiation PBFT
+  shell: "echo '/usr/bin/sawadm genesis config-genesis.batch config-consensus.batch pbft-settings.batch' | docker exec -iu sawtooth {{ inventory_hostname }} /bin/bash -"
+  when: hostvars[inventory_hostname]['consensuscreator'] is defined and hostvars[inventory_hostname]['consensuscreator'] | bool and CONSENSUS_NAME == "pbft"
+  register: output
+  tags:
+  - bm-set
+- name: Finish consensus instantiation RAFT
+  shell: "echo '/usr/bin/sawadm genesis config-genesis.batch config-consensus.batch raft-settings.batch' | docker exec -iu sawtooth {{ inventory_hostname }} /bin/bash -"
+  when: hostvars[inventory_hostname]['consensuscreator'] is defined and hostvars[inventory_hostname]['consensuscreator'] | bool and CONSENSUS_NAME == "raft"
+  register: output
+  tags:
+  - bm-set
+- name: Finish consensus instantiation POET (step 1)
+  shell: "echo 'poet registration create --key /etc/sawtooth/keys/validator.priv -o poet.batch'  | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: hostvars[inventory_hostname]['consensuscreator'] is defined and hostvars[inventory_hostname]['consensuscreator'] | bool and CONSENSUS_NAME == "poet"
+  tags:
+  - bm-set
+- name: Finish consensus instantiation POET (step 2)
+  shell: "echo '/usr/bin/sawadm genesis config-genesis.batch config-consensus.batch poet.batch poet-settings.batch'  | docker exec -iu sawtooth {{ inventory_hostname }} /bin/bash -"
+  when: hostvars[inventory_hostname]['consensuscreator'] is defined and hostvars[inventory_hostname]['consensuscreator'] | bool and CONSENSUS_NAME == "poet"
+  register: output
+  tags:
+  - bm-set
+- debug:
+    msg: "{{ output }}"
+  tags:
+  - bm-set
+- name: Start PBFT service
+  shell: "echo 'systemctl restart sawtooth-rest-api && systemctl restart sawtooth-validator && systemctl restart sawtooth-settings-tp && systemctl restart sawtooth-identity-tp && systemctl restart sawtooth-intkey-tp-python && systemctl restart sawtooth-xo-tp-python && systemctl restart sawtooth-pbft-engine' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: CONSENSUS_NAME == "pbft"
+  tags:
+  - bm-set
+- name: Start POET service
+  shell: "echo 'systemctl restart sawtooth-rest-api && systemctl restart sawtooth-validator && systemctl restart sawtooth-settings-tp && systemctl restart sawtooth-identity-tp && systemctl restart sawtooth-intkey-tp-python && systemctl restart sawtooth-xo-tp-python && systemctl restart sawtooth-poet-validator-registry-tp && systemctl restart sawtooth-poet-engine.service' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: CONSENSUS_NAME == "poet"
+  tags:
+  - bm-set
+- name: Start RAFT service
+  shell: "echo 'systemctl restart sawtooth-rest-api && systemctl restart sawtooth-validator && systemctl restart sawtooth-settings-tp && systemctl restart sawtooth-identity-tp && systemctl restart sawtooth-intkey-tp-python && systemctl restart sawtooth-xo-tp-python && systemctl restart sawtooth-raft-engine.service' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: CONSENSUS_NAME == "raft"  
+  tags:
+  - bm-set
+- name: Set permissions #2
+  shell: "echo 'chown -R sawtooth:sawtooth /var/lib/sawtooth/*' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  tags:
+  - bm-set
+- name: Initialise telegraf 
+  #shell: "echo 'curl -sL https://repos.influxdata.com/influxdb.key | apt-key add - && apt-add-repository \"deb https://repos.influxdata.com/ubuntu bionic stable\" && apt-get update && apt-get install -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" telegraf && systemctl restart telegraf' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  shell: "echo 'service telegraf restart' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  tags:
+  - bm-set

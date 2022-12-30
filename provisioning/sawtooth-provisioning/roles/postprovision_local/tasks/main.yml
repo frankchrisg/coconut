@@ -1,0 +1,8 @@
+- name: Register public keys
+  debug:
+    msg: "{{ item }}"
+  with_file:
+    - '{{ MAIN_CONFIG_PATH }}/public_keys.txt'
+  register: public_keys
+  tags:
+  - bm-set

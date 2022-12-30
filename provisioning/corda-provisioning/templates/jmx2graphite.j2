@@ -1,0 +1,55 @@
+// See the comments throughout this file for usage.
+//
+//  ********** IMPORTANT **********
+//  This configuration file is only used if you're launching jmx2graphite as a
+//  client connecting to a Jolokia agent.
+//
+//  If you're running jmx2graphite as an agent without Jolokia, you need to
+//  configure jmx2graphite with runtime arguments.
+//  *******************************
+//
+
+# The service to poll the JMX metrics from
+service {
+
+  # REQUIRED. Service name
+  name = "{{ inventory_hostname }}"
+  name = ${?SERVICE_NAME}
+
+  # Hostname. If not supplied, taking hostname from jolokiaFullUrl
+  host = ${?SERVICE_HOST}
+
+  poller {
+    jolokia {
+      // REQUIRED. URL of your Jolokia agent:
+      jolokiaFullUrl = "http://{{ hostvars[inventory_hostname]['serverip'] }}:{{ JOLOKIA_START_PORT + groups['node'].index(inventory_hostname) }}/jolokia/"
+      jolokiaFullUrl = ${?JOLOKIA_URL}
+
+    }
+  }
+}
+
+graphite {
+  hostname = "{% if groups['statistics'].0 is defined %}{{ groups['statistics'].0 }}{% else %}\"\"{% endif %}"
+  hostname = ${?GRAPHITE_HOST}
+
+  port = 2004
+  port = ${?GRAPHITE_PORT}
+
+  protocol = "pickled"
+  protocol = ${?GRAPHITE_PROTOCOL}
+
+  connectTimeout = 10
+  socketTimeout = 5
+}
+
+metricsPollingIntervalInSeconds = 30
+metricsPollingIntervalInSeconds = ${?INTERVAL_IN_SEC}
+
+logLevel = INFO
+logLevel = ${?LOG_LEVEL}
+
+filter {
+  whitelistRegEx = ${?WHITE_LIST_REGEX}
+  blacklistRegEx = ${?BLACK_LIST_REGEX}
+}

@@ -1,0 +1,29 @@
+personal.unlockAccount('{% if x_item.address is defined %}{{ x_item.address }}{% else %}{{ address.stdout }}{% endif %}', '{{ ACCOUNT_PASSWORD }}')
+
+var {{ x_item.name }}Contract = web3.eth.contract({{ x_item.abi }});
+var {{ x_item.name }} = {{ x_item.name }}Contract.new(
+   {
+     from: web3.eth.accounts[0], 
+     data: '{{ x_item.bin }}', 
+     gas: {{ x_item.gas }}{% if x_item.value is defined %},
+     value: {{ x_item.value }}{% endif %}
+   }, function(e, contract){
+    if (typeof contract.address != 'undefined') {
+         console.log('CTAddress: ' + contract.address);
+         console.log('TransactionHash: ' + contract.transactionHash);
+    }
+
+ })
+
+/*function sleep() {
+    var start = new Date();
+    var now;
+    while (true) {
+        now = new Date();
+        if (now - start >= {{ PREFERRED_CONTRACT_SLEEP_TIME }}) {
+            break;
+        }
+    }
+}
+
+sleep();*/

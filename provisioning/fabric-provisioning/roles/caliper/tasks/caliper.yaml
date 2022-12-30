@@ -1,0 +1,44 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Clone Caliper repository
+  git:
+    repo: "https://github.com/hyperledger/caliper.git"
+    dest: "{{ CALIPER_PATH }}/caliper"
+    update: "{{ UPDATE_CALIPER_REPOSITORY }}"
+    force: "{{ UPDATE_CALIPER_REPOSITORY }}"
+  throttle: 5
+- name: "Install dependencies for Caliper (may take a long time)"
+# fabric-ca-client@{{ IMAGE_TAG }} failed previously, see https://github.com/hyperledger/caliper/pull/279
+  shell: "npm install && npm install grpc@1.10.1 && npm install fabric-ca-client@{{ IMAGE_TAG }} && npm install fabric-client@{{ IMAGE_TAG }}"
+  args:
+    chdir: "{{ CALIPER_PATH }}/caliper"
+- name: "Install Hyperledger Fabric dependencies for Caliper"
+  shell: "npm run {{ CALIPER_FAB_DEPS }}"
+  args:
+    chdir: "{{ CALIPER_PATH }}/caliper"
+  ignore_errors: yes
+- name: Find private key file
+  find:
+    paths: "{{ LOCAL_CRYPTO_PATH }}/crypto-config/peerOrganizations/{{ CALIPER_PREFERRED_PEER }}/ca/"
+    patterns: "*_sk"
+  register: key
+- name: Create caliper.json
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/caliper.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/caliper_configs/caliper.json"
+- name: Create caliper-config.yaml
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/caliper-config.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/caliper_configs/caliper-config.yaml"
+- name: "Synchronize with NTP, should be set by default"
+  shell: "timedatectl set-ntp 1"
+- name: Replace log file path
+  replace:
+    dest: "{{ CALIPER_PATH }}/caliper/src/comm/bench-flow.js"
+    regexp: 'let output = path\.join\(process\.cwd\(\), `report-\${date}\.html`\);'
+    replace: 'let output = path.join("{{ CENTRAL_LOG_PATH }}", `report-${date}.html`);'
+- name: "Stop all NodeJS Apache ZooKeeper processes started by Caliper (distributed clients)"
+  shell: "kill -9 $(ps aux | grep 'node {{ CALIPER_PATH }}/caliper/src/comm/client/zoo-client.js' | awk '{print $2}')"
+  register: rcfail
+  failed_when: rcfail.rc != 0 and rcfail.rc != -9

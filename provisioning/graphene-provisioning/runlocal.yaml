@@ -1,0 +1,11 @@
+- import_playbook: init.yaml SERIAL_EXECUTION_PB=100 hostset=realservers
+  when: INIT is defined and INIT | bool
+- import_playbook: common.yaml SERIAL_EXECUTION_PB=100 hostset=realservers
+  when: COMMON is defined and COMMON | bool
+- import_playbook: create-binaries.yaml SERIAL_EXECUTION_PB=100 hostset=buildservers
+- import_playbook: prepare-keys.yaml SERIAL_EXECUTION_PB=1 hostset=local
+- import_playbook: copy-configuration-directory.yaml SERIAL_EXECUTION_PB=100 hostset=realservers
+- import_playbook: prepare-environment.yaml SERIAL_EXECUTION_PB=1 hostset=node
+- import_playbook: statistics.yaml SERIAL_EXECUTION_PB=100 hostset=statistics
+- import_playbook: start-nodes.yaml SERIAL_EXECUTION_PB=100 hostset=node
+- import_playbook: statistics-influxdb.yaml SERIAL_EXECUTION_PB=100 hostset=statistics

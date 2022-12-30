@@ -1,0 +1,185 @@
+// unused: additionalP2PAddresses Default: empty list
+attachmentContentCacheSizeMegaBytes={{ ATTACHMENT_CONTENT_CACHE_SIZE_MB }}
+//attachmentCacheBound={{ ATTACHMENT_CACHE_BOUND }}
+// unused: blacklistedAttachmentSigningKeys Default: not defined
+// unused: compatibilityZoneURL (deprecated) Default: not defined
+// unused: cordappSignerKeyFingerprintBlacklist Default: not defined
+cordappSignerKeyFingerprintBlacklist = []
+// Default: true
+crlCheckSoftFail=true
+// Default: not defined
+custom={ {{ CUSTOM_ARGS }} }
+//Default: REPEATABLE_READ, see https://docs.oracle.com/cd/E19830-01/819-4721/beamv/index.html
+database={ {{ DATABASE_ISOLATION_LEVEL_ARG }} }
+// unused - database argument : initialiseSchema Default: true
+// unused - database argument : Default: CorDapp schema creation is controlled with initialiseSchema. initialiseAppSchema
+// unused: dataSourceProperties
+//// Default:
+//// dataSourceClassName = org.h2.jdbcx.JdbcDataSource
+//// dataSource.url = "jdbc:h2:file:"${baseDirectory}"/persistence;DB_CLOSE_ON_EXIT=FALSE;WRITE_DELAY=0;LOCK_TIMEOUT=10000"
+//// dataSource.user = sa
+//// dataSource.password = ""
+detectPublicIp={{ DETECT_PUBLIC_IP | lower }}
+// Default: commented due to self-detection
+devMode={{ DEV_MODE | lower }}
+// unused: devModeOptions 
+// unused: Default: not defined allowCompatibilityZone
+// Default: "company@example.com"
+emailAddress="admin@example.com"
+// Default: not defined unused: extraNetworkMapKeys
+flowMonitorPeriodMillis={{ FLOW_MONITOR_PERIOD_MILLIS }}
+flowMonitorSuspensionLoggingThresholdMillis={{ FLOW_MONITOR_SUSPENSION_LOGGING_THRESHOLD_MILLIS }}
+flowTimeout{ {{ FLOW_TIMEOUT_ARG }} }
+// unused: (deprecated) h2Port
+// unused: Default: NULL h2Settings
+// unused: Default: not defined jarDirs 
+// Default: not defined
+jmxMonitoringHttpPort={{ JMX_MONITORING_HTTP_START_PORT + my_idx }}
+// unused: Default: JOLOKIA jmxReporterType
+// unused: Default: cordacadevpass keyStorePassword
+// unused: Default: true Important: Please do not change. lazyBridgeStart
+// unused: Default: not defined messagingServerAddress
+// unused: Default: not defined messagingServerExternal
+// Default: not defined
+myLegalName="O={{ PARTY }}{{ my_idx }},L={{ LOCALITY }},C={{ COUNTRY }}"
+{% if hostvars[item]['isnotary'] is defined and hostvars[item]['isnotary'] | bool %}
+notary{
+// Default: false
+validating={% if hostvars[item]['validatingnotary'] is defined and hostvars[item]['validatingnotary'] | bool %}true{% else %}false{% endif %}
+
+// Default: not defined
+{% if hostvars[item]['notaryClusterName'] is defined %}serviceLegalName="{{ hostvars[item]['notaryClusterName'] }}"{% else %}{% endif %}
+
+{% if ENABLE_RAFT %}
+raft{
+
+{% set countRaft = namespace(value=1) %}
+{% for host in groups['node'] %}
+{%if hostvars[host]['raftClusterMember'] is defined and hostvars[host]['raftClusterMember'] | bool %}
+{% set countRaft.value = countRaft.value + 1 %}
+{% endif %}
+{% endfor %}
+
+clusterAddresses=[
+// Default: not defined
+
+{% set countRaftIn = namespace(value=1) %}
+{% for host in groups['node'] %}
+{%if hostvars[host]['raftClusterMember'] is defined and hostvars[host]['raftClusterMember'] | bool %}
+{% set countRaftIn.value = countRaftIn.value + 1 %}
+{% if BRIDGED_MODE %}
+"{{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(host) + 3) }}:{{ CONSENSUS_START_PORT + loop.index0 * 10 }}"{% if (countRaftIn.value < countRaft.value) %},{% endif %}
+{% else %}
+"{{ hostvars[host]['serverip'] }}:{{ CONSENSUS_START_PORT + loop.index0 * 10 }}"{% if (countRaftIn.value < countRaft.value) %},{% endif %}
+{% endif %}
+
+{% endif %}
+{% endfor %}
+]
+
+//Default: not defined
+{% if BRIDGED_MODE %}
+nodeAddress="{{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(item) + 3) }}:{{ CONSENSUS_START_PORT + my_idx * 10 }}"
+{% else %}
+nodeAddress="{{ hostvars[item]['serverip'] }}:{{ CONSENSUS_START_PORT + my_idx * 10 }}"
+{% endif %}
+
+{% endif %}
+
+{% if ENABLE_BFTSMART %}
+bftSMaRt{
+// Default: not defined
+
+{% set countBft = namespace(value=1) %}
+{% for host in groups['node'] %}
+{%if hostvars[host]['bftClusterMember'] is defined and hostvars[host]['bftClusterMember'] | bool %}
+{% set countBft.value = countBft.value + 1 %}
+{% endif %}
+{% endfor %}
+
+// Default: not defined
+clusterAddresses=[
+
+{% set countBftIn = namespace(value=1) %}
+{% for host in groups['node'] %}
+{%if hostvars[host]['bftClusterMember'] is defined and hostvars[host]['bftClusterMember'] | bool %}
+{% set countBftIn.value = countBftIn.value + 1 %}
+{% if BRIDGED_MODE %}
+"{{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(host) + 3) }}:{{ CONSENSUS_START_PORT + loop.index0 * 10 }}"{% if (countBftIn.value < countBft.value) %},{% endif %}
+{% else %}
+"{{ hostvars[host]['serverip'] }}:{{ CONSENSUS_START_PORT + loop.index0 * 10 }}"{% if (countBftIn.value < countBft.value) %},{% endif %}
+{% endif %}
+
+{% endif %}
+{% endfor %}
+]
+
+// Default: not defined
+replicaId={{ my_idx }}
+debug=false
+
+{% endif %}
+{% if ENABLE_BFTSMART or ENABLE_RAFT %}
+}
+{% endif %}
+}
+{% endif %}
+networkParameterAcceptanceSettings={
+// Default: true
+autoAcceptEnabled=true
+// unused: Default: empty list excludedAutoAcceptableParameters
+}
+//networkServices{
+// unused: Default: not defined doormanURL
+// unused: Default: not defined networkMapURL
+// unused: Default: not defined pnm
+//}
+// Default: not defined
+p2pAddress="{{ hostvars[item]['serverip'] }}:{{ P2P_START_PORT + my_idx }}"
+// unused: (deprecated) Default: not defined rpcAddress
+rpcSettings{
+    // Default: not defined
+    address="0.0.0.0:{{ RPC_START_PORT + my_idx }}"
+    // Default: not defined
+    adminAddress="0.0.0.0:{{ RPC_ADMIN_START_PORT + my_idx }}"
+    // unused: Default: false standAloneBroker
+    // unused: Default: false useSsl
+    // mandatory if useSsl=true
+    //ssl{
+    // unused: Default: not defined keyStorePath
+    // unused: Default: not defined keyStorePassword    
+    //}
+}
+//rpcUsers{
+// unused: Default: not defined username
+// unused: Default: not defined password
+// unused: Default: not defined permissions
+//}
+security {
+    authService {
+        dataSource {
+            type=INMEMORY
+            users=[
+                {
+                    password={{ USER_PASSWORD }}
+                    permissions=[
+                        ALL
+                    ]
+                    user={{ USER_NAME }}
+                }
+            ]
+        }
+    }
+}
+//sshd {
+// unused: Default: not defined port
+//}
+// unused: Default: not defined systemProperties
+transactionCacheSizeMegaBytes={{ TRANSACTION_CACHE_SIZE_MB }}
+// unused: Default: NULL tlsCertCrlDistPoint
+// unused: Default: NULL tlsCertCrlIssuer
+// unused: Default: trustpass trustStorePassword
+// Default: false Important: Please do not change. 
+useTestClock=false
+// Default: InMemory Important: Please do not change.
+verifierType=InMemory

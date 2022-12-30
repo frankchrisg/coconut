@@ -1,0 +1,41 @@
+# This file containing various hosts is used for building
+# a flexible and scalable network of Quorum
+
+[all:vars]
+ansible_port=22
+ansible_python_interpreter=/usr/bin/python3
+ansible_user=parallels
+ansible_become_user=root
+ansible_ssh_pass=password123
+ansible_become_pass=password123
+
+[local]
+localhost ansible_connection=local
+
+# Currently only one server is expected to serve statistics
+[statistics]
+192.168.178.22 serverip=192.168.178.22
+
+[node]
+node0.node.com serverip=65.108.129.158 istanbulinitiator=true
+#cakeshop=true
+node1.node.com serverip=65.108.129.159
+#cakeshop=true
+node2.node.com serverip=65.108.129.160
+node3.node.com serverip=95.217.47.47
+node4.node.com serverip=135.181.138.116
+node5.node.com serverip=135.181.56.219
+node6.node.com serverip=135.181.60.247
+node7.node.com serverip=65.109.50.100
+
+[realservers]
+65.108.129.158 telegraf=true
+65.108.129.159 telegraf=true
+65.108.129.160 telegraf=true
+95.217.47.47 telegraf=true
+135.181.138.116 telegraf=true
+135.181.56.219 telegraf=true
+135.181.60.247 telegraf=true
+65.109.50.100 telegraf=true
+#10.10.10.3 telegraf=true
+192.168.178.22 executor_main=true

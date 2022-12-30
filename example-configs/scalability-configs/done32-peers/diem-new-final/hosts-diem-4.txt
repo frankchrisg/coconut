@@ -1,0 +1,66 @@
+# This file containing various hosts is used for building
+# a flexible and scalable network of Diem
+
+[all:vars]
+ansible_port=22
+ansible_python_interpreter=/usr/bin/python3
+ansible_user=parallels
+ansible_become_user=root
+ansible_ssh_pass=password123
+ansible_become_pass=password123
+
+[local]
+localhost ansible_connection=local
+
+[node]
+#192.168.2.111 serverip=192.168.2.111 provide_faucet=false
+node0.node.com serverip=65.108.129.158
+#provide_faucet=true
+node1.node.com serverip=65.108.129.159
+node2.node.com serverip=65.108.129.160
+node3.node.com serverip=95.217.47.47
+node4.node.com serverip=135.181.138.116
+node5.node.com serverip=135.181.56.219
+node6.node.com serverip=135.181.60.247
+node7.node.com serverip=65.109.50.100
+node8.node.com serverip=65.108.129.158
+node9.node.com serverip=65.108.129.159
+node10.node.com serverip=65.108.129.160
+node11.node.com serverip=95.217.47.47
+node12.node.com serverip=135.181.138.116
+node13.node.com serverip=135.181.56.219
+node14.node.com serverip=135.181.60.247
+node15.node.com serverip=65.109.50.100
+node16.node.com serverip=65.108.129.158
+node17.node.com serverip=65.108.129.159
+node18.node.com serverip=65.108.129.160
+node19.node.com serverip=95.217.47.47
+node20.node.com serverip=135.181.138.116
+node21.node.com serverip=135.181.56.219
+node22.node.com serverip=135.181.60.247
+node23.node.com serverip=65.109.50.100
+node24.node.com serverip=65.108.129.158
+node25.node.com serverip=65.108.129.159
+node26.node.com serverip=65.108.129.160
+node27.node.com serverip=95.217.47.47
+node28.node.com serverip=135.181.138.116
+node29.node.com serverip=135.181.56.219
+node30.node.com serverip=135.181.60.247
+node31.node.com serverip=65.109.50.100
+
+# Currently only one server is expected to serve statistics
+[statistics]
+192.168.178.22 serverip=192.168.178.22
+
+[realservers]
+65.108.129.158 serverip=65.108.129.158 telegraf=true swarmmanager=true
+65.108.129.159 serverip=65.108.129.159 telegraf=true swarmworker=true
+65.108.129.160 serverip=65.108.129.160 telegraf=true swarmworker=true
+95.217.47.47 serverip=95.217.47.47 telegraf=true swarmworker=true
+135.181.138.116 serverip=135.181.138.116 telegraf=true swarmworker=true
+135.181.56.219 serverip=135.181.56.219 telegraf=true swarmworker=true
+135.181.60.247 serverip=135.181.60.247 telegraf=true swarmworker=true
+65.109.50.100 serverip=65.109.50.100 telegraf=true swarmworker=true
+#10.28.55.241 telegraf=true swarmworker=true
+#10.28.55.242 telegraf=true swarmworker=true
+192.168.178.22 serverip=192.168.178.22 executor_main=true

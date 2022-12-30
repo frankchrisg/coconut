@@ -1,0 +1,25 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Copy the dockerfile
+  copy:
+    src: "{{ DOCKERFILE_PATH }}/"
+    dest: "{{ DOCKERFILE_PATH }}/"
+- name: Restart Docker daemon
+  systemd:
+    state: restarted
+    daemon_reload: yes
+    name: docker
+  become: true
+- name: Build an Ubuntu image for sawtooth
+  docker_image:
+    build:
+      network: host
+      path: "{{ DOCKERFILE_PATH }}/"
+      nocache: "yes"
+      pull: "yes"
+    buildargs:
+      version: "{{ SAWTOOTH_VERSION }}"
+    name: ubuntu-sawtooth
+    force_source: "{{ REBUILD_UBUNTU_SAWTOOTH_DOCKERFILE }}"
+    source: "build"

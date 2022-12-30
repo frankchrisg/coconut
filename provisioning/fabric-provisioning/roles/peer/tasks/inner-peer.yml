@@ -1,0 +1,71 @@
+#- name: Register IP counter
+#  shell: "if [ ! -f /tmp/peerccip.txt ]; then echo \"1\" > /tmp/peerccip.txt && cat /tmp/peerccip.txt; else echo $(($(cat /tmp/peerccip.txt)+1)) > /tmp/peerccip.txt && cat /tmp/peerccip.txt; fi"
+#  register: peer_bridge_ip
+#  when: BRIDGED_MODE
+#- name: Debug peer bridge IP
+#  debug:
+#    msg: "Bridge IP: {{ peer_bridge_ip.stdout }}"
+
+- name: Create peer configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/peer.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/peer_configs/peer{{ my_idx }}.{{ item.domain }}.yaml"
+  loop: "{{ range(0,  certificates_config_peer[outer_index].number) | list }}"
+  loop_control:
+    loop_var: inner_item
+    index_var: my_idx
+  when: inventory_hostname == "peer"~my_idx~"."~item.domain
+  tags:
+  - bm-set
+- name: Create peer telegraf configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/telegraf-container.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/peer_configs/telegraf_peer{{ my_idx }}.{{ item.domain }}.conf"
+  loop: "{{ range(0,  certificates_config_peer[outer_index].number) | list }}"
+  loop_control:
+    loop_var: inner_item
+    index_var: my_idx
+  when: inventory_hostname == "peer"~my_idx~"."~item.domain
+  tags:
+  - bm-set
+
+- name: Create Apache CouchDB Docker configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/couchdb.j2"
+    dest: >-
+      {{ MAIN_CONFIG_PATH }}/couchdb_configs/couchdb{{ my_idx }}.{{ item.domain
+      }}.yaml
+  loop: "{{ range(0,  certificates_config_peer[outer_index].number) | list }}"
+  loop_control:
+    loop_var: inner_item
+    index_var: my_idx
+  when: ENABLE_COUCHDB and inventory_hostname == "peer"~my_idx~"."~item.domain
+  tags:
+  - bm-set
+- name: Create Apache CouchDB telegraf configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/telegraf-container.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/couchdb_configs/telegraf_couchdb{{ my_idx }}.{{ item.domain }}.conf"
+  loop: "{{ range(0,  certificates_config_peer[outer_index].number) | list }}"
+  loop_control:
+    loop_var: inner_item
+    index_var: my_idx
+  when: ENABLE_COUCHDB and inventory_hostname == "peer"~my_idx~"."~item.domain
+  vars:
+    IS_COUCHDB: true
+  tags:
+  - bm-set
+
+- name: Create Apache CouchDB configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/couchdb_default.j2"
+    dest: >-
+      {{ MAIN_CONFIG_PATH }}/couchdb_configs/couchdb{{ my_idx }}.{{ item.domain
+      }}_default.ini
+  loop: "{{ range(0,  certificates_config_peer[outer_index].number) | list }}"
+  loop_control:
+    loop_var: inner_item
+    index_var: my_idx
+  when: ENABLE_COUCHDB and inventory_hostname == "peer"~my_idx~"."~item.domain
+  tags:
+  - bm-set

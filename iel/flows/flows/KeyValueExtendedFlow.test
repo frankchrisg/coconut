@@ -1,0 +1,222 @@
+package com.template.flows;
+
+import co.paralleluniverse.fibers.Suspendable;
+import com.template.contracts.KeyValueExtendedContract;
+import com.template.states.KeyValueExtendedState;
+import net.corda.core.contracts.Command;
+import net.corda.core.contracts.StateAndRef;
+import net.corda.core.flows.*;
+import net.corda.core.identity.Party;
+import net.corda.core.node.services.Vault;
+import net.corda.core.node.services.vault.PageSpecification;
+import net.corda.core.node.services.vault.QueryCriteria;
+import net.corda.core.node.services.vault.Sort;
+import net.corda.core.transactions.SignedTransaction;
+import net.corda.core.transactions.TransactionBuilder;
+import net.corda.core.utilities.ProgressTracker;
+
+import java.security.PublicKey;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+@InitiatingFlow
+@StartableByRPC
+public class KeyValueExtendedFlow extends FlowLogic<Void> {
+
+    private final String[] args;
+    private final String function;
+    private Party notary;
+    private List<Party> counterParties;
+
+    private ProgressTracker.Step get;
+    private ProgressTracker.Step getEx;
+    private ProgressTracker.Step set;
+    private ProgressTracker.Step setEx;
+    private ProgressTracker progressTracker;
+
+    QueryCriteria.VaultQueryCriteria vaultQueryCriteria = new QueryCriteria.VaultQueryCriteria();
+    PageSpecification pageSpecification = new PageSpecification();
+    Sort sort = new Sort(Collections.emptySet());
+
+    @Override
+    public ProgressTracker getProgressTracker() {
+        return this.progressTracker;
+    }
+
+    public KeyValueExtendedFlow(final String functionConstructor, final List<String> args,
+                                final Party notaryConstructor,
+                                final List<Party> counterPartiesConstructor,
+                                final QueryCriteria.VaultQueryCriteria queryCriteriaConstructor,
+                                final PageSpecification pageSpecificationConstructor, final Sort sortConstructor) {
+
+        if (queryCriteriaConstructor != null) {
+            vaultQueryCriteria = queryCriteriaConstructor;
+        }
+        if (pageSpecificationConstructor != null) {
+            pageSpecification = pageSpecificationConstructor;
+        }
+        if (sortConstructor != null) {
+            sort = sortConstructor;
+        }
+
+        if (notaryConstructor != null) {
+            notary = notaryConstructor;
+        }
+        if (counterPartiesConstructor != null) {
+            counterParties = counterPartiesConstructor;
+        }
+
+        function = functionConstructor;
+
+        this.args = args.toArray(new String[0]);
+
+        String signature = this.args[this.args.length - 1];
+
+        if ("Get".equals(function)) {
+            get = new ProgressTracker.Step("keyValueEx/get " + signature);
+            getEx = new ProgressTracker.Step("keyValueEx/get/doesntexist " + signature);
+            progressTracker = new ProgressTracker(get, getEx);
+        } else if ("Set".equals(function)) {
+            set = new ProgressTracker.Step("keyValueEx/set " + signature);
+            setEx = new ProgressTracker.Step("keyValueEx/set/exist " + signature);
+            progressTracker = new ProgressTracker(set, setEx);
+        }
+    }
+
+    @Suspendable
+    private StateAndRef<KeyValueExtendedState> getByKey(String key) {
+
+        Vault.Page<KeyValueExtendedState> keyValueExtendedStatePage =
+                getServiceHub().getVaultService().queryBy(KeyValueExtendedState.class,
+                        vaultQueryCriteria, pageSpecification, sort);
+
+        List<StateAndRef<KeyValueExtendedState>> states = keyValueExtendedStatePage.getStates();
+
+        for (final StateAndRef<KeyValueExtendedState> state : states) {
+            if (key.equals(state.getState().getData().getKey())) {
+                return state;
+            }
+        }
+        return null;
+
+        //return states.filter(state -> key.equals(state.getState().getData().getKey())).findAny().orElse(null);
+    }
+
+    @Suspendable
+    public void get(String[] args) throws FlowException {
+        if (args.length != 3) {
+            throw new FlowException("Call to Get must have 3 parameters");
+        }
+
+        Vault.Page<KeyValueExtendedState> keyValueExtendedStatePage =
+                getServiceHub().getVaultService().queryBy(KeyValueExtendedState.class,
+                        vaultQueryCriteria, pageSpecification, sort);
+
+        List<StateAndRef<KeyValueExtendedState>> states = keyValueExtendedStatePage.getStates();
+
+        //String value = states.filter(state -> args[0].equals(state.getState().getData().getKey())).findAny().map(state -> new String(state.getState().getData().getValue())).orElse("");
+
+        String value = "";
+        for (final StateAndRef<KeyValueExtendedState> state : states) {
+            if (args[0].equals(state.getState().getData().getKey())) {
+                value = new String(state.getState().getData().getValue());
+                break;
+            }
+        }
+
+        boolean keepTransaction = Boolean.parseBoolean(args[1]);
+        if (keepTransaction) {
+            TransactionBuilder txBuilder = new TransactionBuilder(notary);
+
+            KeyValueExtendedState.KeyValueExtendedGetState outputState = new KeyValueExtendedState.KeyValueExtendedGetState(getOurIdentity(), counterParties);
+            txBuilder.addOutputState(outputState);
+            List<PublicKey> requiredSigners = new ArrayList<>();
+            counterParties.forEach(party -> requiredSigners.add(party.getOwningKey()));
+            Command<KeyValueExtendedContract.KeyValueExtendedGetContract.Get> command = new Command<>(new KeyValueExtendedContract.KeyValueExtendedGetContract.Get(),
+                    requiredSigners);
+            txBuilder.addCommand(command);
+
+            SignedTransaction signedTx = getServiceHub().signInitialTransaction(txBuilder);
+            List<FlowSession> sessionList = new ArrayList<>();
+            counterParties.forEach(party -> sessionList.add(initiateFlow(party)));
+
+            SignedTransaction fullySignedTx;
+            try {
+                fullySignedTx = subFlow(new CollectSignaturesFlow(
+                        signedTx, sessionList, CollectSignaturesFlow.tracker()));
+                subFlow(new FinalityFlow(fullySignedTx, sessionList));
+            } catch (FlowException ex) {
+                getLogger().error("Error while handling flow " + ex.getMessage());
+                throw new FlowException("Error while handling flow " + this.getRunId() + " " + ex.getMessage());
+            }
+        }
+
+        if ("".equals(value)) {
+            progressTracker.setCurrentStep(getEx);
+        } else {
+            progressTracker.setCurrentStep(get);
+        }
+
+    }
+
+    @Suspendable
+    private void set(String[] args) throws FlowException {
+        if (args.length != 3) {
+            throw new FlowException("Call to Set must have 3 parameters");
+        }
+
+        String key = args[0];
+        byte[] value = args[1].getBytes();
+
+        TransactionBuilder txBuilder = new TransactionBuilder(notary);
+
+        KeyValueExtendedState outputState = new KeyValueExtendedState(getOurIdentity(), counterParties, key, value);
+
+        StateAndRef<KeyValueExtendedState> byKey = getByKey(key);
+
+        if (byKey != null) {
+            progressTracker.setCurrentStep(setEx);
+        } else {
+            txBuilder.addOutputState(outputState);
+            List<PublicKey> requiredSigners = new ArrayList<>();
+            counterParties.forEach(party -> requiredSigners.add(party.getOwningKey()));
+            Command<KeyValueExtendedContract.Set> command = new Command<>(new KeyValueExtendedContract.Set(),
+                    requiredSigners);
+            txBuilder.addCommand(command);
+
+            SignedTransaction signedTx = getServiceHub().signInitialTransaction(txBuilder);
+            List<FlowSession> sessionList = new ArrayList<>();
+            counterParties.forEach(party -> sessionList.add(initiateFlow(party)));
+
+            SignedTransaction fullySignedTx;
+            try {
+                fullySignedTx = subFlow(new CollectSignaturesFlow(
+                        signedTx, sessionList, CollectSignaturesFlow.tracker()));
+                subFlow(new FinalityFlow(fullySignedTx, sessionList));
+            } catch (FlowException ex) {
+                getLogger().error("Error while handling flow " + ex.getMessage());
+                throw new FlowException("Error while handling flow " + this.getRunId() + " " + ex.getMessage());
+            }
+
+            progressTracker.setCurrentStep(set);
+        }
+    }
+
+    @Suspendable
+    @Override
+    public Void call() throws FlowException {
+
+        if ("Get".equals(function)) {
+            get(args);
+            return null;
+        }
+        if ("Set".equals(function)) {
+            set(args);
+            return null;
+        }
+
+        throw new FlowException("Not yet implemented function called");
+
+    }
+}

@@ -1,0 +1,234 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Set timezone to Europe/Berlin
+  timezone:
+    name: Europe/Berlin
+  become: true
+#- name: Add ansible repository
+#  apt_repository: repo='ppa:ansible/ansible'
+#  become: true
+- name: Add docker repository key
+  apt_key:
+    id: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
+    url: "https://download.docker.com/linux/ubuntu/gpg"
+  become: true
+- name: Add Ubuntu key
+  apt_key:
+    id: 8AA7AF1F1091A5FD
+    url: "hkp://keyserver.ubuntu.com:80"
+  become: true
+- name: Download go
+  get_url:
+    url: "{{ GO_URL }}"
+    dest: /tmp
+    force: "{{ GO_FORCE_DOWNLOAD }}"
+  when: GO_FORCE_DOWNLOAD
+- name: Extract go archive
+  unarchive:
+    src: /tmp/{{ GO_URL.split('/')[-1] }}
+    dest: /tmp
+    remote_src: "yes"
+  when: GO_FORCE_DOWNLOAD
+- name: Delete current go directory
+  file:
+    path: /usr/local/go
+    state: absent
+  when: GO_FORCE_DOWNLOAD
+  become: true
+- name: Move go
+  command: mv /tmp/go /usr/local
+  become: true
+  when:  GO_FORCE_DOWNLOAD
+- name: Clear DNS cache
+  shell: "systemd-resolve --flush-caches"
+  become: true
+- name: Register lsb release
+  command: lsb_release -cs
+  register: lsb_release
+- name: Add docker repository
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ lsb_release.stdout }} stable
+    # If the Docker repository is not available, use the following line
+    # repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable
+    state: present
+  become: true
+- name: Upgrade and update
+  apt:
+    update_cache: yes
+    upgrade: safe
+  become: true
+  tags: packages
+- name: Install necessary packages
+  apt:
+    name:
+      - apt-transport-https
+      - aptitude
+      - bison
+      - ca-certificates
+      - curl
+      #- default-jdk
+      - docker-ce
+      - docker-compose
+      - git
+      - golang-go
+      - gradle
+      - htop
+      - iptraf
+      - jq
+      - libltdl-dev
+      - libtool
+      - lvm2
+      - maven
+      #- nodejs
+      #- npm
+      - openjdk-8-jdk
+      - openjdk-8-demo
+      - openjdk-8-doc
+      - openjdk-8-jre-headless
+      - openjdk-8-source
+      - openjfx
+      - postgresql
+      - postgresql-contrib
+      - python-docker
+      - python3-docker
+      #- python-pip
+      - python3-pip
+      - software-properties-common
+      - speedtest-cli
+      - sshpass
+      - tar
+      - unzip
+  tags: packages
+  ignore_errors: true
+  become: true
+# OpenJDK might cause problems with JavaFX
+- name: Set Java version
+  alternatives:
+    name: java
+    path: /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
+  become: true
+- name: Check if docker-machine exists
+  stat:
+    path: /usr/local/bin/docker-machine
+  register: docker_machine_result
+- name: Install docker-machine (if this task fails, try to execute the command manually)
+  shell: "curl -L https://github.com/docker/machine/releases/download/v0.16.1/docker-machine-`uname -s`-`uname -m` >/tmp/docker-machine &&
+    chmod +x /tmp/docker-machine &&
+    sudo cp /tmp/docker-machine /usr/local/bin/docker-machine"
+  args:
+    warn: no
+  become: true
+  when: docker_machine_result.stat.exists == False
+- name: Install docker for pip
+  pip:
+    name: "{{ item }}"
+  loop:
+    - docker-compose
+  ignore_errors: yes
+#- name: Remove quorum directory
+#  file:
+#    path: "{{ LOCAL_QUORUM_PATH }}"
+#    state: absent
+#  become: true
+- name: Get current user
+  command: whoami
+  register: current_user
+  tags: "chown"
+- name: Add user to docker group
+  user: 'append=yes groups=docker name="{{ current_user.stdout }}"'
+  become: true
+- name: Reset ssh connection
+  meta: reset_connection
+- name: Create main config path
+  file: "path={{ MAIN_CONFIG_PATH }}/ state=directory recurse=yes"
+  become: true
+- name: chown directories to current user
+  file:
+    dest: "{{ BASE_PATH }}"
+    owner: "{{ current_user.stdout }}"
+    group: "{{ current_user.stdout }}"
+    recurse: "yes"
+  become: true
+  register: output
+  tags: "chown"
+- name: Open Docker daemon for TCP-connections
+  lineinfile:
+    path: /lib/systemd/system/docker.service
+    regexp: '^ExecStart=\/usr\/bin\/dockerd.*$'
+    line: "ExecStart=/usr/bin/dockerd --containerd=/run/containerd/containerd.sock -H unix:// -H tcp://0.0.0.0:2375"
+  notify: "Restart Docker daemon"
+  when: hostvars[inventory_hostname]['executor_main'] is not defined
+  become: true
+- import_tasks: clean-environment.yaml
+  when: hostvars[inventory_hostname]['executor_main'] is not defined
+- import_tasks: setup-portainer.yaml
+  when: hostvars[inventory_hostname]['executor_main'] is not defined
+- import_tasks: optimize.yaml
+  tags: "optimize"
+- name: Remove gvm directory
+  file:
+    path: "/home/{{ current_user.stdout }}/.gvm"
+    state: absent
+  become: true
+- name: Get GVM (Go Version Manager)
+  shell: "curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer | bash -"
+  args:
+    warn: no
+- import_tasks: recreate-config-dirs.yaml
+- name: Copy the dockerfile path
+  copy:
+    src: "{{ DOCKERFILE_PATH }}/"
+    dest: "{{ DOCKERFILE_PATH }}/"
+- import_tasks: buildcontainer.yaml
+#- name: Create hosts file
+#  template:
+#    src: "{{ MAIN_CONFIG_PATH }}/hosts.j2"
+#    dest: "{{ MAIN_CONFIG_PATH }}/hosts"
+#- name: Copy the hosts file
+#  copy:
+#    src: "{{ MAIN_CONFIG_PATH }}/hosts"
+#    dest: "/etc/hosts"
+#  become: true
+- name: Add IP addresses
+  lineinfile:
+    dest: /etc/hosts
+    regexp: '.*{{ item }}$'
+    line: "{{ hostvars[item]['serverip'] }} {{item}}"
+    state: present
+  when: hostvars[item]['serverip'] is defined
+  loop: "{{ groups.all }}"
+  become: true
+- name: Create telegraf dir
+  file:
+    path: /etc/telegraf
+    state: directory
+  become: true
+- name: Create empty telegraf config
+  file:
+    path: /etc/telegraf/telegraf.conf
+    state: touch
+  become: true
+- name: Create telegraf.conf
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/telegraf.j2"
+    dest: "/etc/telegraf/telegraf.conf"
+  become: true
+  when: hostvars[inventory_hostname]['telegraf'] is defined and hostvars[inventory_hostname]['telegraf'] | bool
+- name: Initialise telegraf 
+  shell: "curl -sL https://repos.influxdata.com/influxdb.key | apt-key add - && apt-add-repository \"deb https://repos.influxdata.com/ubuntu bionic stable\" && apt-get update && apt-get install -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" telegraf && systemctl restart telegraf"
+  become: true
+  when: hostvars[inventory_hostname]['telegraf'] is defined and hostvars[inventory_hostname]['telegraf'] | bool
+- name: Add user to docker group
+  user: 'append=yes groups=docker name="telegraf"'
+  become: true
+  when: hostvars[inventory_hostname]['telegraf'] is defined and hostvars[inventory_hostname]['telegraf'] | bool
+- name: Reset ssh connection
+  meta: reset_connection
+  when: hostvars[inventory_hostname]['telegraf'] is defined and hostvars[inventory_hostname]['telegraf'] | bool
+- name: Restart telegraf
+  service:
+    name: telegraf
+    state: restarted
+  become: true
+  when: hostvars[inventory_hostname]['telegraf'] is defined and hostvars[inventory_hostname]['telegraf'] | bool

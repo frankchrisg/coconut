@@ -1,0 +1,135 @@
+package com.template.flows;
+
+import co.paralleluniverse.fibers.Suspendable;
+import com.template.contracts.MergeSortBreadthFirstContract;
+import com.template.states.MergeSortBreadthFirstState;
+import net.corda.core.contracts.Command;
+import net.corda.core.flows.*;
+import net.corda.core.identity.Party;
+import net.corda.core.transactions.SignedTransaction;
+import net.corda.core.transactions.TransactionBuilder;
+import net.corda.core.utilities.ProgressTracker;
+
+import java.security.PublicKey;
+import java.util.ArrayList;
+import java.util.List;
+
+@InitiatingFlow
+@StartableByRPC
+public class MergeSortBreadthFirstFlow extends FlowLogic<Void> {
+
+    private final String[] args;
+    private final String function;
+    private Party notary;
+    private List<Party> counterParties;
+
+    private final ProgressTracker.Step sort;
+    private final ProgressTracker progressTracker;
+
+    @Override
+    public ProgressTracker getProgressTracker() {
+        return this.progressTracker;
+    }
+
+    public MergeSortBreadthFirstFlow(final String functionConstructor, final List<String> args,
+                                     final Party notaryConstructor,
+                                     final List<Party> counterPartiesConstructor) {
+
+        if (notaryConstructor != null) {
+            notary = notaryConstructor;
+        }
+        if (counterPartiesConstructor != null) {
+            counterParties = counterPartiesConstructor;
+        }
+
+        function = functionConstructor;
+
+        this.args = args.toArray(new String[0]);
+
+        String signature = this.args[this.args.length - 1];
+
+        sort = new ProgressTracker.Step("sort/mergeSortRec " + signature);
+        progressTracker = new ProgressTracker(sort);
+    }
+
+    // even only **2
+    @Suspendable
+    private void mergeSort(int[] A, int l, int r) throws FlowException {
+
+        for (int m = 1; m <= r - l; m = m + m) {
+            for (int i = l; i <= r; i = i + m * 2) {
+                merge(A, i, i + m - 1, i + 2 * m - 1);
+            }
+        }
+
+        TransactionBuilder txBuilder = new TransactionBuilder(notary);
+
+        MergeSortBreadthFirstState outputState = new MergeSortBreadthFirstState(getOurIdentity(), counterParties);
+        txBuilder.addOutputState(outputState);
+        List<PublicKey> requiredSigners = new ArrayList<>();
+        counterParties.forEach(party -> requiredSigners.add(party.getOwningKey()));
+        Command<MergeSortBreadthFirstContract.Dummy> command = new Command<>(new MergeSortBreadthFirstContract.Dummy(), requiredSigners);
+        txBuilder.addCommand(command);
+
+        SignedTransaction signedTx = getServiceHub().signInitialTransaction(txBuilder);
+        List<FlowSession> sessionList = new ArrayList<>();
+        counterParties.forEach(party -> sessionList.add(initiateFlow(party)));
+
+        SignedTransaction fullySignedTx;
+        try {
+            fullySignedTx = subFlow(new CollectSignaturesFlow(
+                    signedTx, sessionList, CollectSignaturesFlow.tracker()));
+            subFlow(new FinalityFlow(fullySignedTx, sessionList));
+        } catch (FlowException ex) {
+            getLogger().error("Error while handling flow " + ex.getMessage());
+            throw new FlowException("Error while handling flow " + this.getRunId() + " " + ex.getMessage());
+        }
+
+        progressTracker.setCurrentStep(sort);
+    }
+
+    private void merge(int[] A, int l, int q, int r) {
+        int[] B = new int[A.length];
+        if (q + 1 - l >= 0) System.arraycopy(A, l, B, l, q + 1 - l);
+        for (int j = q + 1; j <= r; j++) {
+            B[(r + q + 1 - j)] = A[j];
+        }
+        int s = l;
+        int t = r;
+        for (int k = l; k <= r; k++) {
+            if (B[s] <= B[t]) {
+                A[k] = B[s];
+                s++;
+            } else {
+                A[k] = B[t];
+                t--;
+            }
+        }
+    }
+
+    @Suspendable
+    @Override
+    public Void call() throws FlowException {
+        if ("Sort".equals(function)) {
+
+            if (args.length < 4) {
+                throw new FlowException("Call to Sort must have at least 4 parameters");
+            }
+
+            int[] A = new int[args.length - 3];
+
+            for (int i = 0; i < A.length; i++) {
+                A[i] = Integer.parseInt(args[i]);
+            }
+
+            int l = Integer.parseInt(args[A.length]);
+            int r = Integer.parseInt(args[A.length + 1]);
+
+            mergeSort(A, l, r);
+            return null;
+        }
+
+        throw new FlowException("Not yet implemented function called");
+
+    }
+}

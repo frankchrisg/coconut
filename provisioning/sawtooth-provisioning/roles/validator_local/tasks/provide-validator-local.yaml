@@ -1,0 +1,202 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Create identity-tp configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/sawtooth-identity-tp.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/additional_configs/{{ item }}_sawtooth-identity-tp"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Create sawtooth-rest-api configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/sawtooth-rest-api.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/additional_configs/{{ item }}_sawtooth-rest-api"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Create intkey-tp configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/sawtooth-intkey-tp-python.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/additional_configs/{{ item }}_sawtooth-intkey-tp-python"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+      loop_var: item
+      index_var: my_idx
+  tags:
+  - bm-set
+- name: Create xo-tp configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/sawtooth-xo-tp-python.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/additional_configs/{{ item }}_sawtooth-xo-tp-python"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+      loop_var: item
+      index_var: my_idx
+  tags:
+  - bm-set
+- name: Create pbft engine configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/sawtooth-pbft-engine.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/additional_configs/{{ item }}_sawtooth-pbft-engine"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Create poet engine configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/sawtooth-poet-engine.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/additional_configs/{{ item }}_sawtooth-poet-engine"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Create poet-validator-registry-tp configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/sawtooth-poet-validator-registry-tp.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/additional_configs/{{ item }}_sawtooth-poet-validator-registry-tp"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Create raft engine configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/sawtooth-raft-engine.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/additional_configs/{{ item }}_sawtooth-raft-engine"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Create settings-tp configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/sawtooth-settings-tp.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/additional_configs/{{ item }}_sawtooth-settings-tp"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Create cli configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/cli.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/cli_configs/{{ item }}_cli.toml"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Create validator configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/validator.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/validator_configs/{{ item }}_validator.toml"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Create rest api configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/rest_api.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/rest_configs/{{ item }}_rest.toml"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Create logging configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/log_config.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/log_configs/{{ item }}_log.toml"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Delete validators directory
+  file:
+    state: absent
+    path: "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}"
+  become: true
+  tags:
+  - bm-set
+- name: Create validators directory
+  file:
+    state: directory
+    path: "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}"
+  tags:
+  - bm-set
+- name: Create validator configuration paths
+  file:
+    state: directory
+    path: "{{ BASE_PATH }}/validators/{{ item }}"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: List all files
+  find:
+    paths: "{{ MAIN_CONFIG_PATH }}/additional_configs/"
+    patterns: "*"
+  register: tmp_glob
+  tags:
+  - bm-set
+- name: "Copy additional configuration files:"
+  copy:    
+    src: "{{ item.path }}"
+    dest: "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}{{ item.path.split('_')[-2].split('/')[-1] }}/{{ item.path.split('_')[-2].split('/')[-1] }}_{{ item.path.split('_')[-1] }}"
+  loop: "{{ tmp_glob.files|flatten(levels=1) }}"
+  when: "inventory_hostname == item.path.split('_')[-2].split('/')[-1]"
+  tags:
+  - bm-set
+- name: "Copy validator configuration files"
+  copy:
+    src: "{{ item[0][0] }}/{{ item[0][1] }}_{{ item[1] }}.toml"
+    dest: "{{ BASE_PATH }}/validators/{{ item[0][1] }}/{{ item[0][1] }}_{{ item[1] }}.toml"
+  loop: "{{ ['{{ MAIN_CONFIG_PATH }}/cli_configs', '{{ MAIN_CONFIG_PATH }}/log_configs', '{{ MAIN_CONFIG_PATH }}/rest_configs', '{{ MAIN_CONFIG_PATH }}/validator_configs']|product(groups['validator'])|list|product(['validator', 'rest', 'cli', 'log'])|list }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: item[0][0].endswith(item[1]~'_configs')
+  tags:
+  - bm-set
+- name: Create telegraf.conf
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/telegraf-container.j2"
+    dest: "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}/{{ item }}_telegraf.conf"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Create docker compose file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/validator-compose.j2"
+    dest: "{{ VALIDATOR_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}_compose.yaml"
+  loop: "{{ groups['validator'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set

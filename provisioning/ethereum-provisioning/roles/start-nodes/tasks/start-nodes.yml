@@ -1,0 +1,79 @@
+- name: Add IP addresses to container
+  shell: "echo \"echo {{ hostvars[item]['serverip'] }} {{item}} >> /etc/hosts\" | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: BRIDGED_MODE and hostvars[item]['serverip'] is defined
+  loop: "{{ groups.all }}"
+  tags:
+  - bm-set
+
+- name: Start node
+  shell: "echo '/bin/bash /nodes/node-{{ item }}/node-{{ item }}-{{ CONSENSUS_NAME }}-StartScript.sh' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-run
+#- name: Install jq
+#  shell: "echo 'apt -y update && apt -y install jq' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+#  tags:
+#  - bm-set
+#- name: Add accounts
+#  shell: "echo 'for d in /nodes/* ; do for i in $(seq 1 {{ NUMBER_OF_ACCOUNTS_PER_NODE }}); do echo $({{ BUILD_PATH }}/geth account new --password /passwordfile.txt {% if LIGHTKDF is defined and LIGHTKDF | bool %} --lightkdf {% endif %} --datadir \"$d\") & done; done && for pid in ${pids[*]}; do wait \"$pid\"; done && unset pids' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+#- name: Set account creation script
+#  shell: docker exec -i {{ inventory_hostname}} bash -c "echo 'for d in /nodes/* ; do for i in \$(seq 1 {{ NUMBER_OF_ACCOUNTS_PER_NODE }}); do echo \$({{ BUILD_PATH }}/geth account new --password /passwordfile.txt {% if LIGHTKDF is defined and LIGHTKDF | bool %} --lightkdf {% endif %} --datadir \"\$d\") & done; done && for pid in \${pids[*]}; do wait \"\$pid\"; done && unset pids' > /account-creation.sh"
+#  tags:
+#  - bm-set
+
+- name: Create account-creation script
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/account-creation.j2"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/account-creation.sh"
+  tags:
+  - bm-set
+- name: Copy account-creation script
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/account-creation.sh {{ inventory_hostname }}:/account-creation.sh"
+  tags:
+  - bm-set
+
+- name: Add accounts
+  shell: "echo 'chmod +x account-creation.sh && sh account-creation.sh || true' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  register: status
+  failed_when: status.rc != 0
+  tags:
+  - bm-set
+
+- name: Handle keys and wallets
+  block:
+    - name: Save wallets to temporary file
+      shell: "echo 'for d in /nodes/*node-*/keystore/*; do portVar=$(grep -Phor \"(?<=(--ws.port)).*(?=--ws.api)\" $(dirname $d)/../); cat $d | jq --compact-output --arg wsport $portVar '\"'\"'. + {wsport: $wsport}'\"'\"' >> /wallets-{{ inventory_hostname}}.json; done' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+    - name: Save keys to file
+      shell: "echo 'cat /wallets-{{ inventory_hostname}}.json | jq -r '\"'\"'[.address, .wsport]|@csv'\"'\"' | tr \",\" \" \" | while read line || [[ -n $line ]]; do echo -e $(awk '\"'\"'{print $1}'\"'\"' <<< $line | tr -d \"\\\"\") {{ ACCOUNT_PASSWORD }} {{ hostvars[inventory_hostname][\"serverip\"] }} $(awk '\"'\"'{print $2}'\"'\"' <<< $line | tr -d \"\\\"\")  >> keys-{{ inventory_hostname}}.txt; done' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+    - name: Save wallets to file
+      shell: "echo 'cat /wallets-{{ inventory_hostname}}.json | while read line || [[ -n $line ]]; do echo -e $(echo $line | jq --compact-output '\"'\"'del(.wsport)'\"'\"' | tr -d \" \" ) {{ ACCOUNT_PASSWORD }} {{ hostvars[inventory_hostname][\"serverip\"] }} $(echo $line | jq .wsport | tr -d \"\\\"\") >> wallets-{{ inventory_hostname}}.txt; done' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+    - name: Register keys output
+      shell: "echo 'cat /keys-{{ inventory_hostname}}.txt' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+      register: keys
+    - name: Register wallets output
+      shell: "echo 'cat /wallets-{{ inventory_hostname}}.txt' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+      register: wallets
+    - name: Write wallets to file
+      local_action: lineinfile dest={{ MAIN_CONFIG_PATH }}/wallets.txt line="{{ item }}" state=present insertafter=EOF create=True
+      loop: "{{ wallets.stdout_lines }}"
+      loop_control:
+        loop_var: item
+        index_var: my_idx
+    - name: Write keys to file
+      local_action: lineinfile dest={{ MAIN_CONFIG_PATH }}/keys.txt line="{{ item }}" state=present insertafter=EOF create=True
+      loop: "{{ keys.stdout_lines }}"
+      loop_control:
+        loop_var: item
+        index_var: my_idx
+  throttle: 1
+  tags:
+  - bm-set
+  
+- name: Initialise telegraf 
+#  shell: "echo 'apt update && apt-get install -y software-properties-common gnupg curl &&  curl -sL https://repos.influxdata.com/influxdb.key | apt-key add - && apt-add-repository \"deb https://repos.influxdata.com/ubuntu bionic stable\" && apt-get install -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" telegraf && service telegraf restart' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  shell: "echo 'service telegraf restart' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  tags:
+  - bm-set

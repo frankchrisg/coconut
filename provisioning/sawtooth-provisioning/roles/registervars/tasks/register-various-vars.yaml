@@ -1,0 +1,36 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Check that the keyfile exists
+  local_action:
+    module: stat
+    path: "{{ MAIN_CONFIG_PATH }}/zmqkeys.txt"
+  register: keys_exist
+  throttle: 1
+  tags:
+  - bm-set
+- name: Create keys
+  local_action: shell (echo "import zmq" ; echo "(public, secret)=zmq.curve_keypair()" ; echo "print(public.decode('UTF-8'))" ; echo "print(secret.decode('UTF-8'))") | python3 >> {{ MAIN_CONFIG_PATH }}/zmqkeys.txt
+  when: keys_exist.stat.exists == False 
+  run_once: true
+  tags:
+  - bm-set
+- name: Count lines
+  local_action: shell cat "{{ MAIN_CONFIG_PATH }}/zmqkeys.txt" | wc -l
+  register: lines
+  tags:
+  - bm-set
+- name: Register public key
+  local_action: shell cat {{ MAIN_CONFIG_PATH }}/zmqkeys.txt | awk 'FNR == 1 {print}'
+  register: network_public_key
+  when: lines.stdout|int == 2
+  run_once: true
+  tags:
+  - bm-set
+- name: Register private key
+  local_action: shell cat {{ MAIN_CONFIG_PATH }}/zmqkeys.txt | awk 'FNR == 2 {print}'
+  register: network_private_key
+  when: lines.stdout|int == 2
+  run_once: true
+  tags:
+  - bm-set

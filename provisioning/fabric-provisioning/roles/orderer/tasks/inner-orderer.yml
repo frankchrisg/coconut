@@ -1,0 +1,27 @@
+- name: Create Orderer configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/orderer.j2"
+    dest: >-
+      {{ MAIN_CONFIG_PATH }}/orderer_configs/orderer{{ my_idx }}.{{ item.domain
+      }}.yaml
+  loop: "{{ range(0,  certificates_config_orderer[outer_index].number) | list }}"
+  loop_control:
+    loop_var: inner_item
+    index_var: my_idx
+  when: inventory_hostname == "orderer"~my_idx~"."~item.domain
+  tags:
+  - bm-set
+
+- name: Create Orderer telegraf configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/telegraf-container.j2"
+    dest: >-
+      {{ MAIN_CONFIG_PATH }}/orderer_configs/telegraf_orderer{{ my_idx }}.{{ item.domain
+      }}.conf
+  loop: "{{ range(0,  certificates_config_orderer[outer_index].number) | list }}"
+  loop_control:
+    loop_var: inner_item
+    index_var: my_idx
+  when: inventory_hostname == "orderer"~my_idx~"."~item.domain
+  tags:
+  - bm-set

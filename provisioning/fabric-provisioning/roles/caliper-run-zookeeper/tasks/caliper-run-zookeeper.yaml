@@ -1,0 +1,5 @@
+- name: "Start with Apache ZooKeeper support"
+  shell: "nohup node {{ CALIPER_PATH }}/caliper/src/comm/client/zoo-client.js {{ CALIPER_ZOOKEEPER_SERVER }} </dev/null >/dev/null 2>&1 &"
+  async: 86400
+  poll: 0
+  when: CALIPER_USE_ZOOKEEPER == "true"

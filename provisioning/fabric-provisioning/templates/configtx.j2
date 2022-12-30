@@ -1,0 +1,229 @@
+# This file represents an example configuration and should not be used in productions environments
+#
+# This configuration file is used on the present scenario. It is used to create genesis blocks which are following a specific structure
+#
+# In order to prevent any failures it is not advised to change the variables without further knowledge
+# For further information on this configuration file and the belonging binary, please see: https://hyperledger-fabric.readthedocs.io/en/latest/commands/configtxgen.html
+
+# Capabilities are not part of the present scenario. Adjust as necessary
+# For further information on capabilities please see: https://hyperledger-fabric.readthedocs.io/en/latest/capability_requirements.html
+Capabilities:
+    Global: &ChannelCapabilities
+        V1_1: true
+    Orderer: &OrdererCapabilities
+        V1_1: true
+    Application: &ApplicationCapabilities
+        V1_1: true
+
+Orderer: &OrdererDefaults
+
+    OrdererType: "{{ KAFKA_RAFT_OR_SOLO }}"
+
+    Addresses:
+{%- set rows = [] -%}  
+{%- for outer in certificates_config_orderer -%}
+{%- set another = loop.index0 -%}
+{%- for inner in range(0, outer.number) -%}
+
+{{ rows.append(another*100 + loop.index0) }}
+{%- endfor -%}{%endfor%}
+
+{% for host in groups['orderer'] %}
+            - {{ hostvars[host]['inventory_hostname'] }}:{{ ORDERER_START_PORT + rows[loop.index0] }}
+{% endfor %}
+
+    # The amount of time to wait before a batch is created
+    BatchTimeout: "{{ BATCH_TIMEOUT }}"
+
+    BatchSize:
+        # The maximum number of messages in a batch
+        MaxMessageCount: {{ MAX_MESSAGES }}
+
+        # The absolute maximum number of bytes allowed
+        # for the serialized messages in a batch
+        AbsoluteMaxBytes: "{{ ABSOLUTE_MAX }}"
+
+        # The preferred number of maximum bytes allowed
+        # for the serialized messages in a batch. As the name states, this is only a preferred value
+        # so there isn't any guarantee this value can always be chosen
+        PreferredMaxBytes: "{{ PREFERRED_MAX }}"
+
+    # The maximum number of channels which can be created
+    MaxChannels: {{ MAX_CHANNELS }}
+
+    EtcdRaft:
+        Consenters:
+{%- for host in groups['orderer'] %}  
+{% if hostvars[host]['consenter'] is defined and hostvars[host]['consenter'] | bool %}
+            - Host: {{ hostvars[host]['inventory_hostname'] }}
+              Port: {{ ORDERER_START_PORT + rows[loop.index0] }}
+              ClientTLSCert: {{ LOCAL_CRYPTO_PATH }}/crypto-config/ordererOrganizations/{{ hostvars[host]['inventory_hostname'].split('.')[-2] }}.{{ hostvars[host]['inventory_hostname'].split('.')[-1] }}/orderers/{{ hostvars[host]['inventory_hostname'] }}/tls/server.crt
+              ServerTLSCert: {{ LOCAL_CRYPTO_PATH }}/crypto-config/ordererOrganizations/{{ hostvars[host]['inventory_hostname'].split('.')[-2] }}.{{ hostvars[host]['inventory_hostname'].split('.')[-1] }}/orderers/{{ hostvars[host]['inventory_hostname'] }}/tls/server.crt{% endif %}{% endfor %}
+ 
+        Options:
+            TickInterval: {{ TICK_INTERVAL }}
+            ElectionTick: {{ ELECTION_TICK }}
+            HeartbeatTick: {{ HEARTBEAT_TICK }}
+            MaxInflightBlocks: {{ MAX_INFLIGHT_BLOCKS_RAFT }}
+            SnapshotIntervalSize: {{ SNAPSHOT_INTERVAL_SIZE_RAFT }}
+
+    # In the current scenario Apache Kafka brokers in addition with Apache ZooKeeper should be used. The orderer will connect to those Apache Kafka brokers
+    Kafka:
+        Brokers:
+{% for host in groups['kafka'] %}
+            - {{ hostvars[host]['inventory_hostname'] }}:{{ KAFKA_START_PORT + loop.index0 }}
+{% endfor %}
+
+    Organizations:
+
+      OrdererEndpoints:
+      {%- set rows = [] -%}
+      {%- for outer in certificates_config_orderer -%}
+      {%- set another = loop.index0 -%}
+      {%- for inner in range(0, outer.number) -%}
+
+      {{ rows.append(another*100 + loop.index0) }}
+      {%- endfor -%}{%endfor%}
+
+      {% for host in groups['orderer'] %}
+        - {{ hostvars[host]['inventory_hostname'] }}:{{ ORDERER_START_PORT + rows[loop.index0] }}
+      {% endfor %}
+
+    # Policies are not a relevant part of the present scenario
+    Policies:
+        Readers:
+            Type: ImplicitMeta
+            Rule: "ANY Readers"
+        Writers:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+        Admins:
+            Type: ImplicitMeta
+            Rule: "ANY Admins"
+        BlockValidation:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+
+Organizations:
+
+{% for organizations in organizations_config %}
+    - &{{ organizations.tag }}
+        Name: {{ organizations.name }}
+        ID: {{ organizations.id }}
+        MSPDir: {{ organizations.mspdir }}/msp
+{% if organizations.adminprincipal is defined %}
+        AdminPrincipal: {{ organizations.adminprincipal }}
+{% endif %}
+{% if organizations.anchorpeers is defined %}
+        Anchorpeers:
+        # For further information on anchor peers, please see: https://hyperledger-fabric.readthedocs.io/en/release-1.2/glossary.html#anchor-peer
+{% for organizations in organizations.anchorpeers %}
+            - Host: {{ organizations.anchorpeerhost }}
+              Port: {{ organizations.anchorpeerport }}
+{% endfor %}
+{% else %}
+#        Leftover of a previous Hyperledger Fabric bug. It was required to set a (dummy) peer for every organization otherwise it was not possible to create the genesis block
+#        Anchorpeers:
+#            - Host: 127.0.0.1
+#              Port: 7051
+{% endif %}
+
+        # Policies are not a relevant part of the present scenario
+        Policies:
+            Readers:
+                Type: ImplicitMeta
+                Rule: "ANY Readers"
+            Writers:
+                Type: ImplicitMeta
+                Rule: "ANY Writers"
+            Admins:
+                Type: ImplicitMeta
+                Rule: "ANY Admins"
+            BlockValidation:
+                Type: ImplicitMeta
+                Rule: "ANY Writers"
+{% endfor %}
+
+Application: &ApplicationDefaults
+
+    Organizations:
+
+    # Policies are not a relevant part of the present scenario
+    Policies:
+        Readers:
+            Type: ImplicitMeta
+            Rule: "ANY Readers"
+        Writers:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+        Admins:
+            Type: ImplicitMeta
+            Rule: "ANY Admins"
+        BlockValidation:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+
+Profiles:
+    OrdererGenesis:
+        Capabilities:
+            <<: *ChannelCapabilities
+        Orderer:
+            <<: *OrdererDefaults
+            Organizations:
+{% for organizations in organizations_config %}
+{% if 'orderer_organization' == organizations.type %}
+                - *{{ organizations.tag }}
+{% endif %}
+{% endfor %}
+            Capabilities:
+                <<: *OrdererCapabilities
+        Consortiums:
+            Consortium:
+                Organizations:
+{% for organizations in organizations_config %}
+{% if 'organization' == organizations.type %}
+                - *{{ organizations.tag }}
+{% endif %}
+{% endfor %}
+        # Policies are not a relevant part of the present scenario
+        Policies:
+            Readers:
+                Type: ImplicitMeta
+                Rule: "ANY Readers"
+            Writers:
+                Type: ImplicitMeta
+                Rule: "ANY Writers"
+            Admins:
+                Type: ImplicitMeta
+                Rule: "ANY Admins"
+            BlockValidation:
+                Type: ImplicitMeta
+                Rule: "ANY Writers"
+
+    OrganizationsChannel:
+        Consortium: Consortium
+        Application:
+            <<: *ApplicationDefaults
+            Organizations:
+{% for organizations in organizations_config %}
+{% if 'organization' == organizations.type %}
+                - *{{ organizations.tag }}
+{% endif %}
+{% endfor %}
+            Capabilities:
+                <<: *ApplicationCapabilities
+                
+        Policies:
+            Readers:
+                Type: ImplicitMeta
+                Rule: "ANY Readers"
+            Writers:
+                Type: ImplicitMeta
+                Rule: "ANY Writers"
+            Admins:
+                Type: ImplicitMeta
+                Rule: "ANY Admins"
+            BlockValidation:
+                Type: ImplicitMeta
+                Rule: "ANY Writers"
+

@@ -1,0 +1,153 @@
+- name: Install java and nodejs dependency for cakeshop within container
+  shell: "echo 'apt update && apt install -y openjdk-11-jdk nodejs psmisc' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: Check if file exists
+  stat:
+    path: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ CAKESHOP_FILE }}"
+  register: stat_result
+  when: hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: Download cakeshop
+  get_url:
+    url: "{{ CAKESHOP_URL }}"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ CAKESHOP_FILE }}"
+  when: stat_result is defined and stat_result.stat is defined and stat_result.stat.exists == False and hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: Copy cakeshop to container
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ CAKESHOP_FILE }} {{ inventory_hostname }}:/nodes/node-{{ item }}/node-{{ item }}-cakeshop.war"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: Copy cakeshop to container (non-validator)
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ CAKESHOP_FILE }} {{ inventory_hostname }}:/nodes/non-validator-node-{{ item }}/non-validator-node-{{ item }}-cakeshop.war"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft' and hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: Create application.properties
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/application-properties.j2"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname}}-node-{{ item }}-application.properties"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: Create application.properties (non-validator)
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/application-properties.j2"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname}}-non-validator-node-{{ item }}-application.properties"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft' and hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: Create cakeshop data directory
+  shell: "echo 'mkdir -p /nodes/node-{{ item }}/data/local/' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: Create cakeshop data directory (non-validator)
+  shell: "echo 'mkdir -p /nodes/non-validator-node-{{ item }}/data/local/' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft' and hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: Copy application.properties to container
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname}}-node-{{ item }}-application.properties {{ inventory_hostname }}:/nodes/node-{{ item }}/data/local/application.properties"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: Copy application.properties to container (non-validator)
+  shell: "docker cp {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname}}-non-validator-node-{{ item }}-application.properties {{ inventory_hostname }}:/nodes/non-validator-node-{{ item }}/data/local/application.properties"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft' and hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: Initialize cakeshop
+  shell: "echo '{{ JAVA_PATH }} -jar /nodes/node-{{ item }}/node-{{ item }}-cakeshop.war example' | docker exec -iw /nodes/node-{{ item }} {{ inventory_hostname }} /bin/bash -"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: Initialize cakeshop (non-validator)
+  shell: "echo '{{ JAVA_PATH }} -jar /nodes/non-validator-node-{{ item }}/non-validator-node-{{ item }}-cakeshop.war example' | docker exec -iw /nodes/non-validator-node-{{ item }} {{ inventory_hostname }} /bin/bash -"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft' and hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: Create cakeshop start script within container
+  shell: docker exec -w /nodes/node-{{ item }} {{ inventory_hostname }} bash -c "echo -e '#!/bin/bash\nCAKESHOP_SHARED_CONFIG=\"/nodes/\" nohup {{ JAVA_PATH }} -Dserver.port={{ CAKESHOP_START_PORT + groups['node'].index(inventory_hostname)
+   * 100 + my_idx }} -jar /nodes/node-{{ item }}/node-{{ item }}-cakeshop.war >/dev/null 2>&1 &' > /nodes/node-{{ item }}/cakeshop-start-node-{{ item }}.sh"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: "Start cakeshop (name: {{ CAKESHOP_NODE_NAME }})"
+  shell: "echo 'chmod +x cakeshop-start-{{ CAKESHOP_NODE_NAME }}.sh && /bin/bash cakeshop-start-{{ CAKESHOP_NODE_NAME }}.sh'
+   | docker exec -i -w /nodes/{{ CAKESHOP_NODE_NAME }} {{ inventory_hostname }} /bin/bash -"
+  when: hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: Create cakeshop start script within container (non-validator)
+  shell: docker exec -w /nodes/non-validator-node-{{ item }} {{ inventory_hostname }} bash -c "echo -e '#!/bin/bash\nCAKESHOP_SHARED_CONFIG=\"/nodes/\" nohup {{ JAVA_PATH }} -Dserver.port={{ CAKESHOP_START_PORT + groups['node'].index(inventory_hostname) * 100 + numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int + my_idx }} -jar /nodes/non-validator-node-{{ item }}/non-validator-node-{{ item }}-cakeshop.war >/dev/null 2>&1 &' > cakeshop-start-non-validator-node-{{ item }}.sh"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft' and hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- name: Wait for api
+  wait_for:
+    port: "{{ CAKESHOP_START_PORT + groups['node'].index(inventory_hostname) * 100 + 0 }}"
+    host: "{{inventory_hostname}}"
+  when: hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+- include_tasks: cakeshop-inner.yaml
+  loop: "{{ groups['node'] }}"
+  loop_control:
+    loop_var: outer_item
+  when: hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+

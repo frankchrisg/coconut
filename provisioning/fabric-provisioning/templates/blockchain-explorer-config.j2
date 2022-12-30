@@ -1,0 +1,103 @@
+{
+                        "name": "network-1",
+			"version": "1.0",
+					"client": {
+						"tlsEnable": true,
+                                                "adminUser": "{{ BE_ADMIN_USERNAME }}",
+                                                "adminPassword": "{{ BE_ADMIN_PASSWORD }}",
+												"connection": {
+			"timeout": {
+				"peer": {
+					"endorser": "300"
+				},
+				"orderer": "300"
+			}
+		}
+				},
+				"channels": {
+					{% for channel in additional_channels -%}
+					"{{ channel }}": {
+						"peers": {
+							{% for peer in certificates_config_peer -%}
+							{% set outer = loop.index0 -%}
+							{% set endOne = loop.last -%}
+							{% for number in range(0, peer.number) %}
+							{% if 'peer' + loop.index0|string + '.' + peer.domain not in peers_to_exclude_from_channel_join -%}
+							"peer{{ loop.index0 }}.{{ peer.domain }}": {}{{ '' if endOne and loop.last else ',' }}
+							{% endif -%}
+							{% endfor -%}
+							{% endfor -%}
+						},
+							"connection": {
+								"timeout": {
+									"peer": {
+										"endorser": "600000",
+										"eventHub": "600000",
+										"eventReg": "600000"
+									}
+								}
+							}
+					}{% if not loop.last %},
+						{% endif %}
+					{% endfor -%}
+				},
+				"organizations": {
+					{% for organization in organizations_config %}
+					{% if loop.index <= NUMBER_OF_PEER_ORGS and 'orderer_organization' != organization.type %}
+					"{{ organization.name }}": {
+						"mspid": "{{ organization.id }}",
+							"adminPrivateKey": {
+								"path":
+									{% for sk in sk_files.files -%}
+{% if sk.path | dirname == organization.mspdir + '/users/Admin@' + organization.mspdir.split("/")[-1] + '/msp/keystore' %}
+"{{ sk.path }}"
+{% endif %}
+{% endfor %}
+							},
+							"signedCert": {
+								"path":
+									{% for cert_pem in cert_pem_files.files -%}
+{% if cert_pem.path | dirname == organization.mspdir + "/users/Admin@" + organization.mspdir.split("/")[-1] + '/msp/signcerts' %}
+"{{ cert_pem.path }}"
+{% endif %}
+{% endfor %}
+							}
+					}{{ '' if loop.index == NUMBER_OF_PEER_ORGS else ',' }}{% endif %}
+					{% endfor %}
+				},
+				"peers": {
+					{% for peer in certificates_config_peer %}
+					{% set outer = loop.index0 -%}
+					{% set endOne = loop.last -%}
+					{% for number in range(0, peer.number) %}
+
+					"peer{{ loop.index0 }}.{{ peer.domain }}": {
+						"tlsCACerts": {
+							"path":
+								"{{ LOCAL_CRYPTO_PATH }}/crypto-config/peerOrganizations/{{ peer.domain }}/tlsca/tlsca.{{ peer.domain }}-cert.pem"
+						},
+							"url": "grpcs://peer{{ loop.index0 }}.{{ peer.domain }}:{{ 7000 + outer*100 + loop.index0 }}",
+							"eventUrl": "grpcs://peer{{ loop.index0 }}.{{ peer.domain }}:{{ 17000 + outer*100 + loop.index0 }}",
+							"grpcOptions": {
+								"ssl-target-name-override": "peer{{ loop.index0 }}.{{ peer.domain }}"
+							}
+					}{{ '' if endOne and loop.last else ',' }}
+					{% endfor -%}
+					{% endfor -%}
+				}
+{#,
+				"orderers": {
+					{% for orderer in certificates_config_orderer %}
+					{% set outer = loop.index0 -%}
+					{% set endOne = loop.last -%}
+					{% for number in range(0, orderer.number) %}
+					"orderer{{ loop.index0 }}.{{ orderer.domain }}": {
+						"url": "grpcs://orderer{{ loop.index0 }}.{{ orderer.domain }}:{{ ORDERER_START_PORT + outer + loop.index0 }}",
+							"tls_cacerts": "{{ LOCAL_CRYPTO_PATH }}/crypto-config/ordererOrganizations/{{ orderer.domain }}/orderers/orderer{{ loop.index0 }}.{{ orderer.domain }}/tls/ca.crt"
+					}{{ '' if endOne and loop.last else ',' }}
+
+					{% endfor %}
+					{% endfor %}
+				}
+#}
+}

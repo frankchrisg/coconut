@@ -1,0 +1,14 @@
+- name: Compress configuration directory
+  archive:
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/"
+    dest: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}.tgz"
+    exclude_path:
+      - "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/.git"
+  tags:
+  - bm-set
+- name: Copy configuration directory to remote hosts
+  unarchive:
+    src: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}.tgz"
+    dest: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/"
+  tags:
+  - bm-set

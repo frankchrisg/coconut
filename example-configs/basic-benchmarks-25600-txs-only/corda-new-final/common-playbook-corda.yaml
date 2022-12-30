@@ -1,0 +1,136 @@
+CONFIG_PATH: "templates"
+MAIN_PATH: "{{ playbook_dir }}"
+MAIN_CONFIG_PATH: "{{MAIN_PATH}}/{{CONFIG_PATH}}"
+
+BASE_PATH: "/home/parallels/FINAL_graphene_corda_latest_xxx"
+CHOWN_PATH: "/home/parallels/FINAL_graphene_corda_latest_xxx/"
+
+CORDAPP_WORKFLOWS_BASE_PATH: "/home/parallels/FINAL_graphene_corda_latest_xxx/corda-provisioning/templates/flows"
+CORDAPP_CONTRACTS_BASE_PATH: "/home/parallels/FINAL_graphene_corda_latest_xxx/corda-provisioning/templates/flows"
+CORDAPP_SUB_PATH: "flows"
+
+DOCKERFILE_PATH: "{{MAIN_CONFIG_PATH}}/ubuntu-corda"
+DOCKERFILE_NAME: "ubuntu-corda"
+
+CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH: "{{ BASE_PATH }}/corda-files"
+CORDA_PATH: "{{ BASE_PATH }}/corda-files-bin"
+CORDA_FORCE_CLONE: "no"
+
+# https://docs.r3.com/en/platform/corda/4.5/enterprise/operations/deployment/corda-configuration-fields.html#flowthreadpoolsize
+
+# Default: 10MB
+ATTACHMENT_CONTENT_CACHE_SIZE_MB: 10
+# Default: 1024
+ATTACHMENT_CACHE_BOUND: 1024
+CUSTOM_ARGS: 'jvmArgs: [ "-Xmx12G" ]'
+#'jvmArgs: [ "-Xmx1G", "-XX:+UseG1GC" ]'
+# Default: false
+EXPORT_HIBERNATE_JMX_STATISTICS: false
+# Default: transactionIsolationLevel="REPEATABLE_READ"
+#DATABASE_ISOLATION_LEVEL_ARG: 'transactionIsolationLevel="READ_COMMITTED", 
+#exportHibernateJMXStatistics="{{ EXPORT_HIBERNATE_JMX_STATISTICS | lower }}"'
+DATABASE_ISOLATION_LEVEL_ARG: 'exportHibernateJMXStatistics="{{ EXPORT_HIBERNATE_JMX_STATISTICS | lower }}"'
+
+CORDA_NETWORK_BOOTSTRAPPER_URL: "https://software.r3.com/artifactory/corda/net/corda/corda-tools-network-bootstrapper/4.8.6/corda-tools-network-bootstrapper-4.8.6.jar"
+#"https://software.r3.com/artifactory/corda/net/corda/corda-tools-network-bootstrapper/4.5/corda-tools-network-bootstrapper-4.5.jar"
+#"https://software.r3.com/artifactory/corda/net/corda/corda-tools-network-bootstrapper/4.3/corda-tools-network-bootstrapper-4.3.jar"
+CORDA_URL: "https://software.r3.com/artifactory/corda/net/corda/corda/4.8.6/corda-4.8.6.jar"
+#"https://software.r3.com/artifactory/corda/net/corda/corda/4.5/corda-4.5.jar"
+#"https://software.r3.com/artifactory/corda/net/corda/corda/4.3/corda-4.3.jar"
+DOWNLOAD_CORDA_JAR: true
+
+BOOTSTRAP_LOGGING_LEVEL: "DEBUG"
+#  FirstRunOnly, Yes, No
+BOOTSTRAP_COPY_CORDAPPS: "Yes"
+BOOTSTRAPE_MINIMUM_PLATFORM_VERSION: 5
+
+SLEEP_TIME: "{{ 30 | random(start=10, step=10) }}"
+#SLEEP_TIME_COMMAND: "$((RANDOM % {{ SLEEP_TIME }}))"
+NODE_START_TIME: "{{ SLEEP_TIME }}s"
+
+# Default: 10485760
+BOOTSTRAP_MAX_MESSAGE_SIZE: 10485760
+# Default: 524288000
+BOOTSTRAP_MAX_TRANSACTION_SIZE: 524288000
+# Default: PT720H
+BOOTSTRAP_EVENT_HORIZON: "PT720H"
+
+# Default: false
+DETECT_PUBLIC_IP: false
+DEV_MODE: true
+#  Default: 60 seconds
+FLOW_MONITOR_PERIOD_MILLIS: 60000
+# Default: 60 seconds
+FLOW_MONITOR_SUSPENSION_LOGGING_THRESHOLD_MILLIS: 60000
+# Default: 30
+FLOW_TIMEOUT: 30
+# Default: 6
+MAX_RESTART_COUNT: 6
+# Default: 1.8
+BACK_OFF_BASE: 1.8
+FLOW_TIMEOUT_ARG: 'timeout={{ FLOW_TIMEOUT }}, 
+maxRestartCount={{ MAX_RESTART_COUNT }}, 
+backoffBase={{ BACK_OFF_BASE }}'
+LOCALITY: "Muc"
+COUNTRY: "DE"
+PARTY: "Party-"
+ENABLE_RAFT: false
+ENABLE_BFTSMART: false
+CONSENSUS_START_PORT: 60000
+#53000
+#52600
+P2P_START_PORT: 55000
+#30000
+RPC_START_PORT: 32000
+#32000
+RPC_ADMIN_START_PORT: 45000 
+#33000
+DT_SOCKET_START_PORT: 5000
+#5000
+JOLOKIA_START_PORT: 20000
+#28100
+JMX_MONITORING_HTTP_START_PORT: 15000
+#15000
+USER_NAME: user
+USER_PASSWORD: password123
+# Default: 8 MB plus 5% of all heap memory above 300MB.
+TRANSACTION_CACHE_SIZE_MB: 8
+
+RESTART_NODES: true
+
+JOLOKIA_URL: "https://search.maven.org/remotecontent?filepath=org/jolokia/jolokia-jvm/1.6.2"
+JOLOKIA_JAR: "jolokia-jvm-1.6.2-agent.jar"
+
+"nodes_to_exclude_from_flow": []
+
+INFLUXDB_ADMIN_USER: "admin"
+INFLUXDB_ADMIN_PASSWORD: "password123"
+INFLUXDB_USER: "lrdata"
+INFLUXDB_USER_PASSWORD: "password123"
+INFLUXDB_VERSION: "1.8.4"
+REBUILD_GRAFANA_DOCKERFILE: "no"
+DOCKERFILE_GRAFANA: "grafana"
+
+# Should be used in Docker bridged mode See the templates for network communication in this mode
+NET_NAME: "uncomment_in_file_for_bridged_mode"
+BRIDGED_MODE: true
+
+RETRIES_DOCKER: 100
+DELAY_DOCKER: 1
+
+PRUNE_DOCKER: true
+
+REBUILD_UBUNTU_CORDA_DOCKERFILE: "no"
+
+SWARM_PREFIX: "192.168.2."
+
+# How many tasks should be run in parallel during execution of Ansible
+RUN_LOCAL: false
+SERIAL_EXECUTION_NUMBER: 0
+SERIAL_EXECUTION: "{% if RUN_LOCAL -%}1{% else %}{{SERIAL_EXECUTION_NUMBER}}{% endif %}"
+# The default hostset for Ansible, can be overwritten or set Please pay attention for variable prioritization, see:
+# https://docs.ansible.com/ansible/latest/user_guide/playbooks_variables.html
+# hostset: "local"
+
+INIT: true
+COMMON: true

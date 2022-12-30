@@ -1,0 +1,21 @@
+FROM ubuntu:focal
+# bionic
+
+ARG jdk
+ARG jdk_full
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt update -y && apt upgrade -y
+
+RUN DEBIAN_FRONTEND=noninteractive apt install -y software-properties-common $jdk openjfx
+
+RUN update-java-alternatives -s $jdk_full
+
+RUN apt update && apt install -y curl && curl -sL https://repos.influxdata.com/influxdb.key | apt-key add - && apt-add-repository "deb https://repos.influxdata.com/ubuntu focal stable" && apt-get update && apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" telegraf && service telegraf restart
+
+RUN apt install -y tzdata nano
+RUN cp /usr/share/zoneinfo/Europe/Berlin /etc/localtime
+RUN echo "Europe/Berlin" > /etc/timezone
+
+RUN apt autoremove && apt clean

@@ -1,0 +1,62 @@
+# This file containing various hosts is used for building
+# a flexible and scalable network of Hyperledger Sawtooth
+
+[all:vars]
+ansible_port=22
+ansible_python_interpreter=/usr/bin/python3
+ansible_user=parallels
+ansible_become_user=root
+ansible_ssh_pass=password123
+ansible_become_pass=password123
+
+[local]
+localhost ansible_connection=local
+
+# Currently only one server is expected to serve statistics
+[statistics]
+192.168.178.22 serverip=192.168.178.22
+
+[validator]
+node0.node.com serverip=65.108.129.158 takespartinconsensus=true 
+node1.node.com serverip=65.108.129.159 takespartinconsensus=true 
+node2.node.com serverip=65.108.129.160 takespartinconsensus=true
+node3.node.com serverip=95.217.47.47 takespartinconsensus=true
+node4.node.com serverip=135.181.138.116 takespartinconsensus=true 
+node5.node.com serverip=135.181.56.219 takespartinconsensus=true 
+node6.node.com serverip=135.181.60.247 takespartinconsensus=true 
+node7.node.com serverip=65.109.50.100 takespartinconsensus=true 
+node8.node.com serverip=65.108.129.158 takespartinconsensus=true 
+node9.node.com serverip=65.108.129.159 takespartinconsensus=true 
+node10.node.com serverip=65.108.129.160 takespartinconsensus=true 
+node11.node.com serverip=95.217.47.47 takespartinconsensus=true 
+node12.node.com serverip=135.181.138.116 takespartinconsensus=true 
+node13.node.com serverip=135.181.56.219 takespartinconsensus=true 
+node14.node.com serverip=135.181.60.247 takespartinconsensus=true 
+node15.node.com serverip=65.109.50.100 takespartinconsensus=true 
+node16.node.com serverip=65.108.129.158 takespartinconsensus=true 
+node17.node.com serverip=65.108.129.159 takespartinconsensus=true 
+node18.node.com serverip=65.108.129.160 takespartinconsensus=true 
+node19.node.com serverip=95.217.47.47 takespartinconsensus=true 
+node20.node.com serverip=135.181.138.116 takespartinconsensus=true 
+node21.node.com serverip=135.181.56.219 takespartinconsensus=true 
+node22.node.com serverip=135.181.60.247 takespartinconsensus=true 
+node23.node.com serverip=65.109.50.100 takespartinconsensus=true 
+node24.node.com serverip=65.108.129.158 takespartinconsensus=true 
+node25.node.com serverip=65.108.129.159 takespartinconsensus=true 
+node26.node.com serverip=65.108.129.160 takespartinconsensus=true 
+node27.node.com serverip=95.217.47.47 takespartinconsensus=true 
+node28.node.com serverip=135.181.138.116 takespartinconsensus=true
+node29.node.com serverip=135.181.56.219 takespartinconsensus=true
+node30.node.com serverip=135.181.60.247 takespartinconsensus=true 
+node31.node.com serverip=65.109.50.100 takespartinconsensus=true consensuscreator=true
+
+[realservers]
+65.108.129.158 telegraf=true
+65.108.129.159 telegraf=true
+65.108.129.160 telegraf=true
+95.217.47.47 telegraf=true
+135.181.138.116 telegraf=true
+135.181.56.219 telegraf=true
+135.181.60.247 telegraf=true
+65.109.50.100 telegraf=true
+192.168.178.22 executor_main=true

@@ -1,0 +1,100 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Create crypto-config.yaml
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/crypto-config.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/crypto-config.yaml"
+  tags:
+  - bm-set
+#- name: Create hosts file
+#  template:
+#    src: "{{ MAIN_CONFIG_PATH }}/hosts.j2"
+#    dest: "{{ MAIN_CONFIG_PATH }}/hosts"
+- name: Create configtx.yaml
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/configtx.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/configtx.yaml"
+  tags:
+  - bm-set
+- name: Crate crypto artifacts
+  debug:
+    msg: >-
+      {{ LOCAL_BINARY_PATH }}/bin/cryptogen generate --config={{ MAIN_CONFIG_PATH
+      }}/crypto-config.yaml --output={{ LOCAL_BINARY_PATH }}/crypto-config
+  tags:
+  - bm-set
+- name: Execute cryptogen in order to create crypto artifacts
+  command: >-
+    {{ LOCAL_BINARY_PATH }}/bin/cryptogen generate --config={{ MAIN_CONFIG_PATH
+    }}/crypto-config.yaml --output={{ LOCAL_BINARY_PATH }}/crypto-config
+  tags:
+  - bm-set
+- name: "Archive crypto artifacts directory"
+  archive:
+    path: "{{ LOCAL_BINARY_PATH }}/crypto-config"
+    dest: "{{ LOCAL_BINARY_PATH }}.zip"
+    format: zip
+  tags:
+  - bm-set
+- name: "Unarchive crypto artifacts directory"
+  unarchive:
+    src: "{{ LOCAL_BINARY_PATH }}.zip"
+    dest: "{{ LOCAL_CRYPTO_PATH }}"
+  tags:
+  - bm-set
+
+#- name: Copy crypto artifacts directory
+#  copy:
+#    src: "{{ LOCAL_BINARY_PATH }}/crypto-config"
+#    dest: "{{ LOCAL_CRYPTO_PATH }}"
+
+- name: Debug configtxgen comman
+  debug:
+    msg: "{{ LOCAL_BINARY_PATH }}/bin/configtxgen -profile OrdererGenesis -outputBlock {{ LOCAL_CRYPTO_PATH }}/channel-artifacts/genesis.block -channelID {{ CHANNEL_NAME }}fororderer --configPath {{ MAIN_CONFIG_PATH }}"
+
+- name: Execute configtxgen in order to create the genesis block
+  command: >-
+    {{ LOCAL_BINARY_PATH }}/bin/configtxgen -profile OrdererGenesis -outputBlock
+    {{ LOCAL_CRYPTO_PATH }}/channel-artifacts/genesis.block -channelID {{
+    CHANNEL_NAME }}fororderer --configPath {{ MAIN_CONFIG_PATH }}
+  tags:
+  - bm-set
+- name: Execute configtxgen in order to create channel artifacts
+  command: >-
+    {{ LOCAL_BINARY_PATH }}/bin/configtxgen -profile OrganizationsChannel
+    -outputCreateChannelTx {{ LOCAL_CRYPTO_PATH }}/channel-artifacts/{{ item
+    }}.tx -channelID {{ item }} --configPath {{ MAIN_CONFIG_PATH }}
+  loop: "{{ additional_channels|flatten(levels=1) }}"
+  tags:
+  - bm-set
+- name: >-
+    Execute configtxgen in order to create channel artifacts for the anchor
+    peers
+  command: >-
+    {{ LOCAL_BINARY_PATH }}/bin/configtxgen -profile OrganizationsChannel
+    -outputAnchorPeersUpdate {{ LOCAL_CRYPTO_PATH }}/channel-artifacts/{{ item.0
+    }}{{ item.1.name }}.tx -channelID {{ item.0 }} --configPath {{ MAIN_CONFIG_PATH }}
+    -asOrg {{ item.1.name }}
+  loop: >-
+    {{ additional_channels|flatten(levels=1)|product(organizations_config)|list
+    }}
+  when: item.1.type != 'orderer_organization'
+  tags:
+  - bm-set
+#- name: Copy the hosts file
+#  copy:
+#    src: "{{ MAIN_CONFIG_PATH }}/hosts"
+#    dest: "/etc/hosts"
+#  become: true
+- name: Add IP addresses
+  lineinfile:
+    dest: /etc/hosts
+    regexp: '.*{{ item }}$'
+    line: "{{ hostvars[item]['serverip'] }} {{item}}"
+    state: present
+  when: hostvars[item]['serverip'] is defined
+  loop: "{{ groups.all }}"
+  become: true
+  tags:
+  - bm-set

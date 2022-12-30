@@ -1,0 +1,42 @@
+#- name: Delete directories for node configuration
+#  file:
+#    path: "{{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}"
+#    state: absent
+- name: Get current user
+  command: whoami
+  register: current_user
+  tags:
+  - bm-set
+  - chown
+- name: Create directories for node configuration
+  file:
+    path: "{{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}"
+    state: directory
+    owner: "{{ current_user.stdout }}"
+    group: "{{ current_user.stdout }}"
+  tags:
+  - bm-set
+- name: Copy node configuration files
+  synchronize:
+    src: "{{ DIEM_NODE_CONFIGURATION_PATH }}/{{ DIEM_NODE_CONFIGURATION_DIR }}/{{ item }}"
+    dest: "{{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}"
+  loop:
+    - "{{ play_hosts.index(inventory_hostname) }}"
+    - "mint.key"
+    - "genesis-storage.json"
+  loop_control:
+    index_var: my_idx
+    loop_var: item
+  tags:
+  - bm-set
+- name: Copy node configuration file
+  synchronize:
+    #          {{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}/diem-node-{{ my_idx }}.yaml
+    src: "{{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}/diem-node-{{ groups['node'].index(inventory_hostname) }}.yaml"
+    dest: "{{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}"
+  tags:
+  - bm-set
+#- name: Copy node configuration file
+#  synchronize:
+#    src: "{{ DIEM_NODE_CONFIGURATION_PATH }}/{{ DIEM_NODE_CONFIGURATION_DIR }}/{{ play_hosts.index(inventory_hostname) }}"
+#    dest: "{{ DIEM_NODE_CONFIGURATION_PATH }}/{{ DIEM_NODE_CONFIGURATION_DIR }}"

@@ -1,0 +1,10 @@
+- name: "Archive logs from CENTRAL_LOG_PATH: {{ CENTRAL_LOG_PATH }}"
+  archive:
+    path: "{{ CENTRAL_LOG_PATH }}"
+    dest: "{{ CENTRAL_LOG_PATH }}.zip"
+    format: zip
+- name: "Fetch logs from remote"
+  fetch:
+    src: "{{ CENTRAL_LOG_PATH }}.zip"
+    dest: "{{ LOCAL_LOG_PATH }}"
+    fail_on_missing: no

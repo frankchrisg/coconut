@@ -1,0 +1,63 @@
+- name: Define Endpoints (without tessera)
+  uri:
+    url: "http://{{ inventory_hostname }}:{{ CAKESHOP_START_PORT + groups['node'].index(inventory_hostname) * 100 + 0 }}/api/node/add"
+    method: POST
+    body_format: json
+    return_content: yes
+    status_code: "201"
+    body: "{\"name\":\"node-{{ my_idx }}-{{ outer_item }}\",\"rpcUrl\":\"http://{{ outer_item }}:{{ RPC_START_PORT + groups['node'].index(outer_item) * 100 + my_idx }}\",\"transactionManagerUrl\":\"http://localhost:9081\"}"
+  loop: "{% if additional_nodes_per_container[groups['node'].index(outer_item)].number | int is defined and additional_nodes_per_container[groups['node'].index(outer_item)].number | int > 0 %}{{ range(0, additional_nodes_per_container[groups['node'].index(outer_item)].number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: not ENABLE_TESSERA and hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+
+- name: Define Endpoints (with tessera)
+  uri:
+    url: "http://{{ inventory_hostname }}:{{ CAKESHOP_START_PORT + groups['node'].index(inventory_hostname) * 100 + 0 }}/api/node/add"
+    method: POST
+    body_format: json
+    return_content: yes
+    status_code: "201"
+    body: "{\"name\":\"node-{{ my_idx }}-{{ outer_item }}\",\"rpcUrl\":\"http://{{ outer_item }}:{{ RPC_START_PORT + groups['node'].index(outer_item) * 100 + my_idx }}\",\"transactionManagerUrl\":\"http://{{ outer_item }}:{{ TESSERA_PORT + groups['node'].index(outer_item) * 100 + my_idx }}\"}"
+  loop: "{% if additional_nodes_per_container[groups['node'].index(outer_item)].number | int is defined and additional_nodes_per_container[groups['node'].index(outer_item)].number | int > 0 %}{{ range(0, additional_nodes_per_container[groups['node'].index(outer_item)].number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: ENABLE_TESSERA and hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+
+- name: Define Endpoints (non-validator without tessera)
+  uri:
+    url: "http://{{ inventory_hostname }}:{{ CAKESHOP_START_PORT + groups['node'].index(inventory_hostname) * 100 + 0 }}/api/node/add"
+    method: POST
+    body_format: json
+    return_content: yes
+    status_code: "201"
+    body: "{\"name\":\"non-validator-node-{{ my_idx }}-{{ outer_item }}\",\"rpcUrl\":\"http://{{ outer_item }}:{{ RPC_START_PORT + groups['node'].index(outer_item) * 100 + my_idx + numberOfNodes.results[groups['node'].index(outer_item)].item.number | int }}\",\"transactionManagerUrl\":\"http://localhost:9081\"}"
+  loop: "{% if numberOfNodes.results[groups['node'].index(outer_item)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(outer_item)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(outer_item)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == "istanbulbft" and not ENABLE_TESSERA and hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set
+
+- name: Define Endpoints (non-validator with tessera)
+  uri:
+    url: "http://{{ inventory_hostname }}:{{ CAKESHOP_START_PORT + groups['node'].index(inventory_hostname) * 100 + 0 }}/api/node/add"
+    method: POST
+    body_format: json
+    return_content: yes
+    status_code: "201"
+    body: "{\"name\":\"non-validator-node-{{ my_idx }}-{{ outer_item }}\",\"rpcUrl\":\"http://{{ outer_item }}:{{ RPC_START_PORT + groups['node'].index(outer_item) * 100 + my_idx + numberOfNodes.results[groups['node'].index(outer_item)].item.number | int }}\",\"transactionManagerUrl\":\"http://{{ outer_item }}:{{ TESSERA_PORT + groups['node'].index(outer_item) * 100 + my_idx + numberOfNodes.results[groups['node'].index(outer_item)].item.number | int }}\"}"
+  loop: "{% if numberOfNodes.results[groups['node'].index(outer_item)].item.additional_non_validators | int is defined and numberOfNodes.results[groups['node'].index(outer_item)].item.additional_non_validators | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(outer_item)].item.additional_non_validators | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == "istanbulbft" and ENABLE_TESSERA and hostvars[inventory_hostname]['cakeshop'] is defined and hostvars[inventory_hostname]['cakeshop'] | bool
+  tags:
+  - bm-set

@@ -1,0 +1,73 @@
+- name: Set cores
+  set_fact:
+    CPU_SET: '{% if hostvars[inventory_hostname]["cpu_cores"] is defined -%}{{ hostvars[inventory_hostname]["cpu_cores"] }}{% else %}{{MAX_CPU_CORES}}{% endif %}'
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Get and set ca.pem
+  shell: "find  {{ LOCAL_CRYPTO_PATH }}/crypto-config/*/*/tlsca/ -type f -name tlsca.*.pem | xargs cat > {{ BENCHMARKING_CA_PATH }}"
+- name: Add Oracle Java Repository
+  apt_repository: repo='ppa:webupd8team/java'
+  become: true
+- name: Accept Java 8 License
+  debconf: name='oracle-java8-installer' question='shared/accepted-oracle-license-v1-1' value='true' vtype='select'
+  become: true
+- name: Install Oracle Java 8
+  apt: name={{ item }} state=latest
+  loop:
+    - oracle-java8-installer
+    - oracle-java8-set-default
+  become: true
+- name: Set Java version
+  alternatives:
+    name: java
+    path: /usr/lib/jvm/java-8-oracle/jre/bin/java
+  become: true
+- name: Build the JVM container image
+  docker_image:
+    path: "{{ MAIN_CONFIG_PATH }}"
+    dockerfile: "JVM-Dockerfile"
+    name: client-jvm
+    force: "{{ REBUILD_JVM_IMAGE_IF_EXISTS }}"
+    nocache: "yes"
+  when: BUILD_JVM_IMAGE
+- name: Information regarding Benchmarking-Client
+  debug:
+    msg: >-
+      Please make sure to adjust the jar file prior to running the tests. The variable is
+      currently set to: {{ BENCHMARKING_CLIENT_JAR }}. Also prepare the class BenchmarkingUserInterfaceSimulation accordingly.
+# Breaks the strategy for the Playbook
+#- name: Pause before running Benchmarking-Client
+#  pause:
+#    prompt: "Waiting for {{ SLEEP_TIME }} seconds before starting the Benchmarking-Client"
+#    echo: no
+#    seconds: "{{ SLEEP_TIME }}"
+# If processes take to long add keepalive values to the SSH configurations.
+- name: Start JVM container on {{ inventory_hostname }}
+  docker_container:
+    name: client-jvm
+    image: "client-jvm"
+    restart_policy: "no"
+    privileged: "yes"
+    recreate: "yes"
+    volumes:
+      - "{{ BENCHMARKING_CLIENT_JAR_PATH }}:{{ BENCHMARKING_CLIENT_JAR_PATH }}"
+      - "{{ CENTRAL_LOG_PATH }}:{{ CENTRAL_LOG_PATH }}"
+    network_mode: host
+    cpuset_cpus: "{{ CPU_SET }}"
+    memory: "{{ MAX_MEMORY }}"
+  when: RUN_IN_JVM_CONTAINER
+- name: Run JAR in container
+  shell: echo "sleep {{ SLEEP_TIME_COMMAND }} && {{ SCRIPTS_PATH }}/runBenchmark.sh {{ BENCHMARKING_CLIENT_JAR_PATH }} {{ BENCHMARKING_CLIENT_JAR }} {{ BENCHMARKING_CLIENT_FULL_ID }} {{ CENTRAL_LOG_PATH }} {{ inventory_hostname }}- {{ BENCHMARKING_CA_PATH }} {{ BENCHMARKING_MAX_CLIENT_THREADS }} {{ BENCHMARKING_CLIENT_RERUNS }} {% if hostvars[inventory_hostname]['channel'] is defined -%}{{ hostvars[inventory_hostname]['channel'] }} {% else %} {{ CHANNEL_NAME }} {% endif %} {% if hostvars[inventory_hostname]['threads'] is defined -%}{{ hostvars[inventory_hostname]['threads'] }} {% endif %} >> {{ CENTRAL_LOG_PATH }}clientDebugStdoutLogs.txt 2>&1" | docker exec --interactive client-jvm /bin/bash
+  register: output
+  when: RUN_IN_JVM_CONTAINER
+- name: "Run benchmarking-client automatically command: {{ SCRIPTS_PATH }}/runBenchmark.sh {{ BENCHMARKING_CLIENT_JAR_PATH }} {{ BENCHMARKING_CLIENT_JAR }} {{ BENCHMARKING_CLIENT_FULL_ID }} {{ CENTRAL_LOG_PATH }} {{ inventory_hostname }}- {{ BENCHMARKING_CA_PATH }} {{ BENCHMARKING_MAX_CLIENT_THREADS }} {{ BENCHMARKING_CLIENT_RERUNS }} {% if hostvars[inventory_hostname]['channel'] is defined -%}{{ hostvars[inventory_hostname]['channel'] }} {% else %} {{ CHANNEL_NAME }} {% endif %} {% if hostvars[inventory_hostname]['threads'] is defined -%}{{ hostvars[inventory_hostname]['threads'] }} {% endif %}"
+  shell: "sleep {{ SLEEP_TIME_COMMAND }} && {{ SCRIPTS_PATH }}/runBenchmark.sh {{ BENCHMARKING_CLIENT_JAR_PATH }} {{ BENCHMARKING_CLIENT_JAR }} {{ BENCHMARKING_CLIENT_FULL_ID }} {{ CENTRAL_LOG_PATH }} {{ inventory_hostname }}- {{ BENCHMARKING_CA_PATH }} {{ BENCHMARKING_MAX_CLIENT_THREADS }} {{ BENCHMARKING_CLIENT_RERUNS }} {% if hostvars[inventory_hostname]['channel'] is defined -%}{{ hostvars[inventory_hostname]['channel'] }} {% else %} {{ CHANNEL_NAME }} {% endif %} {% if hostvars[inventory_hostname]['threads'] is defined -%}{{ hostvars[inventory_hostname]['threads'] }} {% endif %} >> {{ CENTRAL_LOG_PATH }}clientDebugStdoutLogs.txt 2>&1"
+  become: true
+  register: output
+  when: not RUN_IN_JVM_CONTAINER
+- name: Remove JVM container
+  docker_container:
+    name: "client-jvm"
+    state: absent
+    purge_networks: "yes"

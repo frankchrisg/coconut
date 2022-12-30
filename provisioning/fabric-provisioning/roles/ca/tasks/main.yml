@@ -1,0 +1,7 @@
+- name: Pull CA docker image
+  docker_image:
+    name: "hyperledger/fabric-ca:{{ CA_IMAGE_TAG }}"
+    tag: "fabric-ca"
+  tags:
+  - bm-set
+- import_tasks: provide-ca.yaml

@@ -1,0 +1,22 @@
+BASE_PATH: "/home/parallels/FINAL_graphene_corda_latest_xxx"
+POSTGRES_PLAYBOOK_PATH: "/home/parallels/FINAL_graphene_corda_latest_xxx/postgres"
+SSH_USER_CLI: parallels
+SSH_PASSWORD_CLI: password123
+SSH_HOST_CLI: 192.168.178.22
+CLI_NAME: cli.peerone.com
+QUORUM_KEYS_LOCATION: "/home/parallels/FINAL_graphene_corda_latest_xxx/quorum-provisioning/templates/keys.txt"
+QUORUM_KEYS_DESTINATION: "{{ MAIN_CONFIG_PATH }}/additional_configs/quorumKeys.txt"
+QUORUM_CONTRACT_FILE_LOCATION: "/home/parallels/FINAL_graphene_corda_latest_xxx/quorum-related/quorum-nodes/contract_addresses.txt"
+QUORUM_CONTRACT_FILE_DESTINATION: "{{ MAIN_CONFIG_PATH }}/additional_configs/quorumContracts.txt"
+GRAPHENE_KEYS_LOCATION: "/home/parallels/FINAL_graphene_corda_latest_xxx/graphene-files/initial-accounts-keys_and_addresses.txt"
+GRAPHENE_KEYS_DESTINATION: "{{ MAIN_CONFIG_PATH }}/additional_configs/witness-file"
+FABRIC_CA_LOCATION: "{{ MAIN_CONFIG_PATH }}/additional_configs/ca.pem"
+FABRIC_ORDERER_CA_LOCATION: "{{ MAIN_CONFIG_PATH }}/additional_configs/ordererCa.pem"
+GRAPHENE_NODE_ADDRESS: "185.132.177.76:11000"
+RUN_ID: "-runid"
+FORCE_COPY_JARS: true
+CLIENT_JAR: "ABPES-1.0-SNAPSHOT-jar-with-dependencies.jar"
+BASIC_SYSTEM: fabric
+MAX_CPU_CORES: "0-15"
+SLEEP_TIME: "{{ 10 | random(start=1, step=1) }}"
+CLIENT_PARAMS: "-Xmx12G -javaagent:quasar-core-0.8.0.jar=mb --module-path /usr/share/openjfx/lib --add-modules=javafx.base"

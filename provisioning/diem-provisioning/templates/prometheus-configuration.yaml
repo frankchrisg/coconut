@@ -1,0 +1,21 @@
+global:
+  scrape_interval:     120s # By default, scrape targets every 15 seconds.
+  evaluation_interval: 120s # By default, scrape targets every 15 seconds.
+  # scrape_timeout is set to the global default (10s).
+
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'prometheus'
+    scrape_interval: 120s
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+    basic_auth:
+      username: lrdata
+      password: password123
+    static_configs:
+      - targets: ['192.168.178.22:9090', '192.168.178.22:8098','192.168.178.22:9100']
+
+  - job_name: 'diem'
+    scrape_interval: 120s
+    static_configs:
+      - targets: ['node0.node.com:45000','node0.node.com:50000','node1.node.com:45001','node1.node.com:50001','node2.node.com:45002','node2.node.com:50002','node3.node.com:45003','node3.node.com:50003','node4.node.com:45004','node4.node.com:50004','node5.node.com:45005','node5.node.com:50005','node6.node.com:45006','node6.node.com:50006','node7.node.com:45007','node7.node.com:50007']

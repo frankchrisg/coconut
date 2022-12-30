@@ -1,0 +1,34 @@
+package com.template.flows;
+
+import co.paralleluniverse.fibers.Suspendable;
+import net.corda.core.crypto.SecureHash;
+import net.corda.core.flows.*;
+import net.corda.core.transactions.SignedTransaction;
+import org.jetbrains.annotations.NotNull;
+
+@InitiatedBy(SelectionSortFlow.class)
+public class SelectionSortFlowResponder extends FlowLogic<Void> {
+    private final FlowSession otherPartySession;
+
+    public SelectionSortFlowResponder(final FlowSession otherPartySession) {
+        this.otherPartySession = otherPartySession;
+    }
+
+    @Suspendable
+    @Override
+    public Void call() throws FlowException {
+        class SignTxFlow extends SignTransactionFlow {
+            private SignTxFlow(FlowSession otherPartySession) {
+                super(otherPartySession);
+            }
+
+            @Override
+            protected void checkTransaction(@NotNull final SignedTransaction stx) {
+            }
+        }
+        SecureHash expectedTxId = subFlow(new SignTxFlow(otherPartySession)).getId();
+        subFlow(new ReceiveFinalityFlow(otherPartySession, expectedTxId));
+        return null;
+    }
+
+}

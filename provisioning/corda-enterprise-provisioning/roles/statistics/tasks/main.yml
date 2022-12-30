@@ -1,0 +1,47 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Get container status
+  shell: docker inspect --format={{ '{{.State.Running}}' }} graphite
+  register: status
+  failed_when: status.rc != 1 and status.rc != 0
+- name: Pull statsd docker image
+  docker_image:
+    name: "graphiteapp/graphite-statsd:latest"
+    tag: "docker-graphite-statsd"
+  when: status.stdout != "true"
+- name: Create statsd volume
+  docker_volume:
+    name: statsd_data
+  when: status.stdout != "true"
+- name: Create Graphite directory to mount if it does not exist
+  file:
+    path: /var/lib/graphite-data
+    state: directory
+    mode: '0755'
+  become: true
+- name: Start statsd on {{ inventory_hostname }}
+  docker_container:
+    name: graphite
+    image: "graphiteapp/graphite-statsd:latest"
+    restart_policy: always
+    env:
+      GRAPHITE_TIME_ZONE: "Europe/Berlin"
+    volumes:
+      - /var/lib/graphite-data:/opt/graphite/storage
+    network_mode: host
+  when: status.stdout != "true"
+- name: Wait for graphite container
+  wait_for:
+    port: "80"
+    host: "{{inventory_hostname}}"
+# Maybe it's necessary to update the password of the root user by using the command within the container:
+# PYTHONPATH=/opt/graphite/webapp /opt/graphite/bin/django-admin.py changepassword --settings=graphite.settings
+- name: Add tzdata
+  shell: echo "apk add tzdata" | docker exec --interactive graphite /bin/sh
+- name: Copy timezone
+  shell: echo "cp /usr/share/zoneinfo/Europe/Berlin /etc/localtime" | docker exec --interactive graphite /bin/sh
+- name: Set timezone
+  shell: echo "echo 'Europe/Berlin' > /etc/timezone" | docker exec --interactive graphite /bin/sh
+- name: Restart graphite
+  shell: docker restart graphite

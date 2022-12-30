@@ -1,0 +1,20 @@
+- name: Get public keys for consensus
+  shell: "docker exec {{ inventory_hostname }} cat /etc/sawtooth/keys/validator.pub"
+  register: public_key
+  tags:
+  - bm-set
+- name: "Gathered public key: {{ public_key.stdout_lines }}"
+  debug:
+    msg: "{{ public_key.stdout_lines }} {{ inventory_hostname }}"
+  tags:
+  - bm-set
+- name: Add public key to file
+  local_action:
+    module: lineinfile
+    path: "{{ MAIN_CONFIG_PATH }}/public_keys.txt"
+    line: "\"{{ public_key.stdout }}\""
+    create: yes
+  when: hostvars[inventory_hostname]['takespartinconsensus'] is defined and hostvars[inventory_hostname]['takespartinconsensus'] | bool
+  throttle: 1
+  tags:
+  - bm-set

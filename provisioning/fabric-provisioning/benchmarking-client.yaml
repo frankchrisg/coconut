@@ -1,0 +1,9 @@
+- import_playbook: registervars.yaml hostset=benchmarking-client
+- hosts: benchmarking-client
+  strategy: free
+  serial: "{% if SERIAL_EXECUTION|int > 0 %}{{ SERIAL_EXECUTION|int }}{% else %}{{ SERIAL_EXECUTION_PB }}{% endif %}"
+  roles:
+    - benchmarking-client
+  vars_files:
+    - vars/common-vars.yaml
+    - vars/statistics-vars.yaml

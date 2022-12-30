@@ -1,0 +1,207 @@
+- name: Set cores
+  set_fact:
+    CPU_SET: '{% if hostvars[inventory_hostname]["cpu_cores"] is defined -%}{{ hostvars[inventory_hostname]["cpu_cores"] }}{% else %}{{MAX_CPU_CORES}}{% endif %}'
+  tags:
+  - bm-set
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+# {{ hostvars[item]['ansible_default_ipv4']['address'] }} {{ hostvars[item]['ansible_env'].SSH_CONNECTION.split(' ')[2] }}"
+##- name: "Register offset"
+##  shell: "if [ ! -f {{ CLIENT_PATH }}/counter.txt ] ; then echo {{ OFFSET_ID }} > {{ CLIENT_PATH }}/counter.txt ; fi"
+##  run_once: true
+##- name: "Get value for run_id"
+##  shell: "echo $(expr $(cat {{ CLIENT_PATH }}/counter.txt 2>/dev/null) + 1) > {{ CLIENT_PATH }}/counter.txt && echo \"$(cat {{ CLIENT_PATH }}/counter.txt)-$(date | tr -d ' ')\""
+#"expr $(cat {{ CLIENT_PATH }}/counter.txt 2>/dev/null) + 1 && echo $(expr $(cat {{ CLIENT_PATH }}/counter.txt 2>/dev/null) + 1) > {{ CLIENT_PATH }}/counter.txt"
+##  run_once: true
+#  shell: "echo $(date){{RUN_ID}}"
+# date +%T
+##  register: run_id
+##  run_once: true
+
+- name: Get run_id
+  shell: "sed -n 's/RUN_ID=//p' {{ CLIENT_PATH }}/{{ inventory_hostname }}/configs/generalConfiguration.properties"
+  #shell: "sed -n 's/RUN_ID=//p' {{ CLIENT_PATH }}/client_skel/configs/generalConfiguration.properties"
+  register: run_id
+  tags:
+  - bm-set
+- name: Create telegraf.conf
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/telegraf-container.j2"
+    dest: "{{ CLIENT_PATH }}/{{ inventory_hostname }}_telegraf.conf"
+  tags:
+  - bm-set
+##        {% set valSet = false %}
+##        {% if parameter == 'generalConfiguration.properties' and not valSet %}- RUN_ID=: "{{run_id.stdout }}"{% endif %}
+##        {% set valSet = true %}
+
+- name: "Set custom template for configuration"
+  set_fact: 
+    configuration: |
+        {% for parameter in parameters %}
+        "{{ parameter }}":
+        
+        {% for dict in parameters | dict2items %}
+
+        {% if parameter == dict.key %}
+        
+        {% if dict.value != None %}
+        {% for x in dict.value %}
+        - {{ (x | dict2items).0.key }}: {{ (x | dict2items).0.value }}
+        {% endfor %}
+        {% endif %}
+
+        {% endif %}
+        {% endfor %}
+        {% endfor %}
+  tags:
+  - bm-set
+- set_fact:
+    configuration_yml: "{{ configuration | from_yaml }}"
+  tags:
+  - bm-set
+- include_tasks: executeReplaceScript.yml
+  loop: "{{ configuration_yml | dict2items }}"
+  loop_control:
+    loop_var: outer_item
+    index_var: outer_index
+  tags:
+  - bm-set
+#- name: Pause before running Client
+#  pause:
+#    prompt: "Waiting for {{ SLEEP_TIME }} seconds before starting the Client"
+#    echo: no
+#    seconds: "{{ SLEEP_TIME }}"
+
+- name: Copy hosts file
+  copy:
+    src: "{{ HOST_FILE_SOURCE }}"
+    dest: "{{ HOST_FILE_DEST }}"
+    remote_src: "{{ HOST_FILE_REMOTE_SRC }}" 
+  when: COPY_HOSTS_FILE
+  become: true
+  tags:
+  - bm-set
+- name: "Set custom mount points"
+  set_fact: 
+    mount_points: |
+          - {{ CLIENT_PATH }}/{{ inventory_hostname }}:{{ CLIENT_PATH }}/{{ inventory_hostname }}
+          - {{ CLIENT_PATH }}/{{ inventory_hostname }}_telegraf.conf:/etc/telegraf/telegraf.conf
+          {% for jar in JARS %}
+          - {{ JAR_PATH_JARS }}/{{ jar }}:{{ CLIENT_PATH }}/{{ inventory_hostname }}/{{ jar }}
+          {% endfor %}
+          {% if COPY_HOSTS_FILE %}
+          - {{ HOST_FILE_DEST }}:{{ HOST_FILE_DEST_CONTAINER }}
+          {% endif %}
+  tags:
+  - bm-set
+- set_fact:
+    mount_points_yml: "{{ mount_points | from_yaml }}"
+  tags:
+  - bm-set
+
+- name: Debug mount points
+  debug:
+    msg: "Mount points: {{ mount_points_yml }}"
+  tags:
+  - bm-set
+
+- name: Start JVM container
+  docker_container:
+    name: client-jvm-{{ inventory_hostname }}
+    image: "client-jvm"
+    restart_policy: "no"
+    privileged: "yes"
+    recreate: "yes"
+    volumes: 
+      "{{ mount_points_yml }}"
+    network_mode: "{% if BRIDGED_MODE %}bridge{% else %}host{% endif %}"
+    cpuset_cpus: "{{ CPU_SET }}"
+    memory: "{{ MAX_MEMORY }}"
+#    command: "sleep infinity"
+    interactive: "yes"
+    tty: "yes"
+    working_dir: "{{ CLIENT_PATH }}/{{ inventory_hostname }}"
+  when: RUN_IN_JVM_CONTAINER
+  tags:
+  - bm-run
+- name: Initialise telegraf 
+#  shell: "echo 'apt update && apt install -y curl && curl -sL https://repos.influxdata.com/influxdb.key | apt-key add - && apt-add-repository \"deb https://repos.influxdata.com/ubuntu focal stable\" && apt-get update && apt-get install -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" telegraf && service telegraf restart' | docker exec -i client-jvm-{{ inventory_hostname }} /bin/bash -"
+  shell: "echo 'service telegraf restart' | docker exec -i client-jvm-{{ inventory_hostname }} /bin/bash -"
+  when: RUN_IN_JVM_CONTAINER
+  tags:
+  - bm-run
+- name: Debug command
+  debug:
+    msg: "$(which java) -jar {{ CLIENT_PARAMS }} {{ CLIENT_JAR }} &> abpes_jar.log"
+  tags:
+  - bm-run
+- name: Run JAR in container
+  shell: echo "sleep {{ SLEEP_TIME_COMMAND }} && $(which java) -jar {{ CLIENT_PARAMS }} {{ CLIENT_JAR }} &> abpes_jar.log" | docker exec --interactive -w {{ CLIENT_PATH }}/{{ inventory_hostname }} client-jvm-{{ inventory_hostname}} /bin/bash
+  register: output
+  when: RUN_IN_JVM_CONTAINER
+  tags:
+  - bm-run
+  
+- name: Install openjfx
+  apt:
+    name: openjfx
+    state: present
+  when: not RUN_IN_JVM_CONTAINER
+  tags:
+  - bm-run
+  
+- name: "Run benchmarking-client {{ inventory_hostname }}"
+  shell: "sleep {{ SLEEP_TIME_COMMAND }} && $(which java) -jar {{ CLIENT_PARAMS }} {{ CLIENT_JAR }}"
+  args:
+    chdir: "{{ CLIENT_PATH }}/{{ inventory_hostname }}"
+  become: true
+  register: output
+  when: not RUN_IN_JVM_CONTAINER
+  tags:
+  - bm-run
+- name: Remove JVM container
+  docker_container:
+    name: "client-jvm-{{ inventory_hostname }}"
+    auto_remove: "yes"
+    cleanup: "yes"
+    state: absent
+  tags:
+  - bm-run
+- name: Create backup path
+  file:
+    path: "{{ BACKUP_PATH }}"
+    state: directory
+  delegate_to: localhost
+  tags:
+  - bm-run
+- name: Create backup specific path
+  file:
+    path: "{{ BACKUP_PATH }}/{{ inventory_hostname }}-{{ run_id.stdout }}"
+    state: directory
+  delegate_to: localhost
+  when: CREATE_CLIENT_BACKUP
+  tags:
+  - bm-run
+- name: Save backup to local
+  synchronize: 
+    src: "{{ CLIENT_PATH }}/{{ inventory_hostname }}"
+    dest: "{{ BACKUP_PATH }}/{{ inventory_hostname }}-{{ run_id.stdout }}"
+    mode: pull
+    rsync_opts:
+      - "--exclude=*.jar"
+      - "--exclude=*.csv"
+  when: CREATE_CLIENT_BACKUP
+  tags:
+  - bm-run
+- name: Remove IP addresses from hosts
+  lineinfile:
+    dest: /etc/hosts
+    regexp: '.*{{ item }}$'
+    line: "{{ hostvars[item]['serverip'] }} {{item}}"
+    state: absent
+  when: hostvars[item]['serverip'] is defined
+  loop: "{{ groups.all }}"
+  become: true
+  tags:
+  - bm-run

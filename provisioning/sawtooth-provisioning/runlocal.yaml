@@ -1,0 +1,12 @@
+- import_playbook: init.yaml SERIAL_EXECUTION_PB=100 hostset=realservers
+  when: INIT is defined and INIT | bool
+- import_playbook: common.yaml SERIAL_EXECUTION_PB=100 hostset=realservers
+  when: COMMON is defined and COMMON | bool
+- import_playbook: validator-local.yaml SERIAL_EXECUTION_PB=100 hostset=local
+- import_playbook: validator.yaml SERIAL_EXECUTION_PB=100 hostset=validator
+- import_playbook: postprovision.yaml SERIAL_EXECUTION_PB=1 hostset=validator
+#^100
+- import_playbook: postprovision_local.yaml SERIAL_EXECUTION_PB=100 hostset=local
+- import_playbook: postprovision_consensus.yaml SERIAL_EXECUTION_PB=100 hostset=validator
+- import_playbook: statistics.yaml SERIAL_EXECUTION_PB=100 hostset=statistics
+- import_playbook: setup_transaction_processors.yaml SERIAL_EXECUTION_PB=100 hostset=validator

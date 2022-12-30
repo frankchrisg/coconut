@@ -1,0 +1,84 @@
+# This file containing various hosts is used for building
+# a flexible and scalable network of Graphene
+
+[all:vars]
+ansible_port=22
+ansible_python_interpreter=/usr/bin/python3
+ansible_user=parallels
+ansible_ssh_pass=password123
+ansible_become_user=root
+ansible_become_pass=password123
+
+[local]
+localhost ansible_connection=local
+
+# Currently only one server is expected to serve statistics
+[statistics]
+192.168.178.22 serverip=192.168.178.22
+
+[node]
+node0.node.com serverip=65.108.129.158 witnesses=1 number_of_client_accounts=100 stale_production=true required_participation=0
+node1.node.com serverip=65.108.129.159 witnesses=1 number_of_client_accounts=100 stale_production=false resync-blockchain=true
+node2.node.com serverip=65.108.129.160 witnesses=1 number_of_client_accounts=100 stale_production=false resync-blockchain=true
+node3.node.com serverip=95.217.47.47 witnesses=1 number_of_client_accounts=100 stale_production=false resync-blockchain=true
+node4.node.com serverip=135.181.138.116 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node5.node.com serverip=135.181.56.219 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node6.node.com serverip=135.181.60.247 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node7.node.com serverip=65.109.50.100 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node8.node.com serverip=65.108.129.158 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node9.node.com serverip=65.108.129.159 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node10.node.com serverip=65.108.129.160 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node11.node.com serverip=95.217.47.47 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node12.node.com serverip=135.181.138.116 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node13.node.com serverip=135.181.56.219 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node14.node.com serverip=135.181.60.247 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node15.node.com serverip=65.109.50.100 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node16.node.com serverip=65.108.129.158 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node17.node.com serverip=65.108.129.159 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node18.node.com serverip=65.108.129.160 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node19.node.com serverip=95.217.47.47 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node20.node.com serverip=135.181.138.116 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node21.node.com serverip=135.181.56.219 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node22.node.com serverip=135.181.60.247 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node23.node.com serverip=65.109.50.100 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node24.node.com serverip=65.108.129.158 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node25.node.com serverip=65.108.129.159 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node26.node.com serverip=65.108.129.160 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node27.node.com serverip=95.217.47.47 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node28.node.com serverip=135.181.138.116 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node29.node.com serverip=135.181.56.219 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node30.node.com serverip=135.181.60.247 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+node31.node.com serverip=65.109.50.100 witnesses=1 number_of_client_accounts=1 stale_production=false resync-blockchain=true
+
+[buildservers]
+192.168.178.22
+65.108.129.158
+65.108.129.159
+65.108.129.160
+95.217.47.47
+135.181.138.116
+135.181.56.219
+135.181.60.247
+65.109.50.100
+#10.10.10.1
+#10.10.10.2
+#10.10.10.5
+#10.10.10.6
+#10.10.10.7
+#10.10.10.3
+
+[realservers]
+65.108.129.158 serverip=65.108.129.158 telegraf=true
+65.108.129.159 serverip=65.108.129.159 telegraf=true
+65.108.129.160 serverip=65.108.129.160 telegraf=true
+95.217.47.47 serverip=95.217.47.47 telegraf=true
+135.181.138.116 serverip=135.181.138.116 telegraf=true
+135.181.56.219 serverip=135.181.56.219 telegraf=true
+135.181.60.247 serverip=135.181.60.247 telegraf=true
+65.109.50.100 serverip=65.109.50.100 telegraf=true
+#10.10.10.2 telegraf=true
+#10.10.10.5 telegraf=true
+#10.10.10.6 telegraf=true
+#10.10.10.7 telegraf=true
+#10.10.10.3 telegraf=true
+192.168.178.22 executor_main=true

@@ -1,0 +1,4 @@
+*.jar filter=lfs diff=lfs merge=lfs -text
+data/raw/allblockdataonly-diemonly filter=lfs diff=lfs merge=lfs -text
+data/raw/allblockdataonly filter=lfs diff=lfs merge=lfs -text
+provisioning/fabric-provisioning/templates/telegraf/usr/bin/telegraf filter=lfs diff=lfs merge=lfs -text

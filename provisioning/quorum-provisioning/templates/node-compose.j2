@@ -1,0 +1,188 @@
+version: "2"
+
+volumes:
+  {{ item }}:
+
+#networks:
+#  {{ NET_NAME }}:
+
+{% if BRIDGED_MODE -%}
+networks:
+  quorum:
+{% endif %}
+
+services:
+  {{ item }}:
+    container_name: {{ item }}
+    image: {{ DOCKERFILE_NAME }}
+    {% if BRIDGED_MODE -%}
+    network_mode: "bridge"
+    ports:
+#      - {{ P2P_START_PORT + groups['node'].index(item) * 100 + my_idx }}:{{ P2P_START_PORT + groups['node'].index(item) * 100 + my_idx }}
+#      - {{ P2P_START_PORT + groups['node'].index(item) * 100 + my_idx + additional_nodes_per_container[groups['node'].index(item)].number | int }}:{{ P2P_START_PORT + groups['node'].index(item) * 100 + my_idx + additional_nodes_per_container[groups['node'].index(item)].number | int }}
+      {% for n in range(additional_nodes_per_container[groups['node'].index(item)].number | int) -%}
+      - {{ P2P_START_PORT + groups['node'].index(item) * 100 + n }}:{{ P2P_START_PORT + groups['node'].index(item) * 100 + n }}
+      {% endfor %}
+      
+      {% if CONSENSUS_NAME == 'istanbulbft' -%}
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int, numberOfNodes.results[groups['node'].index(item)].item.number | int + numberOfNodes.results[groups['node'].index(item)].item.additional_non_validators | int) -%}
+      
+      - {{ P2P_START_PORT + groups['node'].index(item) * 100 + n }}:{{ P2P_START_PORT + groups['node'].index(item) * 100 + n }}
+      
+      {% endfor %}
+      {% endif %}
+
+
+#      - {{ RPC_START_PORT + groups['node'].index(item) * 100 + my_idx }}:{{ RPC_START_PORT + groups['node'].index(item) * 100 + my_idx }}
+      
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int) -%}
+      - {{ RPC_START_PORT + groups['node'].index(item) * 100 + n }}:{{ RPC_START_PORT + groups['node'].index(item) * 100 + n }}
+      {% endfor %}
+      
+      {% if CONSENSUS_NAME == 'istanbulbft' -%}
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int, numberOfNodes.results[groups['node'].index(item)].item.number | int + numberOfNodes.results[groups['node'].index(item)].item.additional_non_validators | int) -%}
+      
+      - {{ RPC_START_PORT + groups['node'].index(item) * 100 + n }}:{{ RPC_START_PORT + groups['node'].index(item) * 100 + n }}
+      
+      {% endfor %}
+      {% endif %}
+
+      
+#      - {{ WS_START_PORT + groups['node'].index(item) * 100 + my_idx }}:{{ WS_START_PORT + groups['node'].index(item) * 100 + my_idx }}
+
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int) -%}
+      - {{ WS_START_PORT + groups['node'].index(item) * 100 + n }}:{{ WS_START_PORT + groups['node'].index(item) * 100 + n }}
+      {% endfor %}      
+
+      {% if CONSENSUS_NAME == 'istanbulbft' -%}
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int, numberOfNodes.results[groups['node'].index(item)].item.number | int + numberOfNodes.results[groups['node'].index(item)].item.additional_non_validators | int) -%}
+      
+      - {{ WS_START_PORT + groups['node'].index(item) * 100 + n }}:{{ WS_START_PORT + groups['node'].index(item) * 100 + n }}
+      
+      {% endfor %}
+      {% endif %}
+
+#      - {{ CONSENSUS_START_PORT + groups['node'].index(item) * 100 + my_idx }}:{{ CONSENSUS_START_PORT + groups['node'].index(item) * 100 + my_idx }}
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int) -%}
+      - {{ CONSENSUS_START_PORT + groups['node'].index(item) * 100 + n }}:{{ CONSENSUS_START_PORT + groups['node'].index(item) * 100 + n }}
+      {% endfor %}
+
+      {% if CONSENSUS_NAME == 'istanbulbft' -%}
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int, numberOfNodes.results[groups['node'].index(item)].item.number | int + numberOfNodes.results[groups['node'].index(item)].item.additional_non_validators | int) -%}
+      
+      - {{ CONSENSUS_START_PORT + groups['node'].index(item) * 100 + n }}:{{ CONSENSUS_START_PORT + groups['node'].index(item) * 100 + n }}
+      
+      {% endfor %}
+      {% endif %}
+
+
+#      - {{ CAKESHOP_START_PORT + groups['node'].index(item) * 100 + 0 }}:{{ CAKESHOP_START_PORT + groups['node'].index(item) * 100 + 0 }}
+
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int) -%}
+
+      {% if hostvars[item]['cakeshop'] is defined and hostvars[item]['cakeshop'] | bool -%}
+      - {{ CAKESHOP_START_PORT + groups['node'].index(item) * 100 + n }}:{{ CAKESHOP_START_PORT + groups['node'].index(item) * 100 + n }}
+      {% endif %}
+
+      {% endfor %}
+
+      {% if CONSENSUS_NAME == 'istanbulbft' -%}
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int, numberOfNodes.results[groups['node'].index(item)].item.number | int + numberOfNodes.results[groups['node'].index(item)].item.additional_non_validators | int) -%}
+      
+      {% if hostvars[item]['cakeshop'] is defined and hostvars[item]['cakeshop'] | bool -%}
+      - {{ CAKESHOP_START_PORT + groups['node'].index(item) * 100 + n }}:{{ CAKESHOP_START_PORT + groups['node'].index(item) * 100 + n }}
+      {% endif %}
+      
+      {% endfor %}
+      {% endif %}
+
+
+#      - {{ TESSERA_PORT + groups['node'].index(item) * 100 + my_idx }}:{{ TESSERA_PORT + groups['node'].index(item) * 100 + my_idx }}
+
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int) -%}
+      
+      {% if ENABLE_TESSERA -%}
+      - {{ TESSERA_PORT + groups['node'].index(item) * 100 + n }}:{{ TESSERA_PORT + groups['node'].index(item) * 100 + n }}
+      {% endif %}
+      
+      {% endfor %}
+
+      {% if CONSENSUS_NAME == 'istanbulbft' -%}
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int, numberOfNodes.results[groups['node'].index(item)].item.number | int + numberOfNodes.results[groups['node'].index(item)].item.additional_non_validators | int) -%}
+      
+      {% if ENABLE_TESSERA -%}
+      - {{ TESSERA_PORT + groups['node'].index(item) * 100 + n }}:{{ TESSERA_PORT + groups['node'].index(item) * 100 + n }}
+      {% endif %}
+      
+      {% endfor %}
+      {% endif %}
+
+
+#      - {{ TESSERA_P2P + groups['node'].index(item) * 100 + my_idx }}:{{ TESSERA_P2P + groups['node'].index(item) * 100 + my_idx }}
+
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int) -%}
+      
+      {% if ENABLE_TESSERA -%}
+      - {{ TESSERA_P2P + groups['node'].index(item) * 100 + n }}:{{ TESSERA_P2P + groups['node'].index(item) * 100 + n }}
+      {% endif %}
+      
+      {% endfor %}
+      
+      {% if CONSENSUS_NAME == 'istanbulbft' -%}
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int, numberOfNodes.results[groups['node'].index(item)].item.number | int + numberOfNodes.results[groups['node'].index(item)].item.additional_non_validators | int) -%}
+      
+      {% if ENABLE_TESSERA -%}
+      - {{ TESSERA_P2P + groups['node'].index(item) * 100 + n }}:{{ TESSERA_P2P + groups['node'].index(item) * 100 + n }}
+      {% endif %}
+      
+      {% endfor %}
+      {% endif %}
+
+#      - {{ CONSTELLATION_PORT + groups['node'].index(item) * 100 + my_idx }}:{{ CONSTELLATION_PORT + groups['node'].index(item) * 100 + my_idx }}
+      {% for n in range(additional_nodes_per_container[groups['node'].index(item)].number | int) -%}
+      
+      {% if ENABLE_CONSTELLATION -%}
+      - {{ CONSTELLATION_PORT + groups['node'].index(item) * 100 + n }}:{{ CONSTELLATION_PORT + groups['node'].index(item) * 100 + n }}
+      {% endif %}
+      
+      {% endfor %}
+      
+      {% if CONSENSUS_NAME == 'istanbulbft' -%}
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int, numberOfNodes.results[groups['node'].index(item)].item.number | int + numberOfNodes.results[groups['node'].index(item)].item.additional_non_validators | int) -%}
+      
+      {% if ENABLE_CONSTELLATION -%}
+      - {{ CONSTELLATION_PORT + groups['node'].index(item) * 100 + n }}:{{ CONSTELLATION_PORT + groups['node'].index(item) * 100 + n }}
+      {% endif %}
+      
+      {% endfor %}
+      {% endif %}
+
+    {% else -%}
+    network_mode: "host"
+    {% endif %}
+
+    restart: always
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+    #    ports:
+    #      - "{{ 50000 + my_idx }}:7054"
+    tty: true
+    #command: tail -f /dev/null
+    volumes:
+      - /etc/timezone:/etc/timezone
+      - /etc/security/limits.conf:/etc/security/limits.conf
+      - /etc/sysctl.conf:/etc/sysctl.conf
+      - {{ BUILD_PATH }}:{{ BUILD_PATH}}
+      - {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/passwordfile.txt:/passwordfile.txt
+      - {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/getKeys.sh:/getKeys.sh
+      - {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/nodes
+{% if CONSENSUS_NAME == 'istanbulbft' %}
+      - {{ ISTANBUL_BUILD_PATH }}/istanbul:/istanbulbft/istanbul
+{% endif %}
+{% if ENABLE_TESSERA %}
+      - {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH.split('/')[0:-1] | join('/') }}/tessera.jar:{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/tessera.jar
+{% endif %}
+{% if ENABLE_CONSTELLATION %}
+      - {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH.split('/')[0:-1] | join('/') }}/quorum-nodes/{{CONSTELLATION_URL.split('/')[-1].split('.')[0:-2] | join('.')}}/constellation-node:{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/constellation/constellation-node
+{% endif %}
+      - {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}_telegraf.conf:/etc/telegraf/telegraf.conf

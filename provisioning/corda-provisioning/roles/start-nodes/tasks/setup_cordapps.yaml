@@ -1,0 +1,34 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Debug cordapp location
+  debug:
+    msg: "{{ item }} to {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/cordapps"
+  loop:
+    - "{{ CORDAPP_WORKFLOWS_BASE_PATH }}"
+    - "{{ CORDAPP_CONTRACTS_BASE_PATH }}"
+#- name: Copy cordapps
+#  copy:
+#    src: "{{ item }}"
+#    dest: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/cordapps"
+#  loop:
+#    - "{{ CORDAPP_WORKFLOWS_BASE_PATH }}"
+#    - "{{ CORDAPP_CONTRACTS_BASE_PATH }}"
+#  when: "inventory_hostname not in nodes_to_exclude_from_flow"
+
+- name: Copy cordapps
+  synchronize:
+    src: "{{ item }}"
+    dest: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/cordapps"
+  loop:
+    - "{{ CORDAPP_WORKFLOWS_BASE_PATH }}"
+    - "{{ CORDAPP_CONTRACTS_BASE_PATH }}"
+  when: "inventory_hostname not in nodes_to_exclude_from_flow"
+  tags:
+  - bm-set
+
+- name: Copy cordapps to container
+  shell: "for f in {{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/cordapps/{{ CORDAPP_SUB_PATH }}/*.jar; do docker cp $f {{ inventory_hostname }}:{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}/cordapps/; done"
+  when: "inventory_hostname not in nodes_to_exclude_from_flow"
+  tags:
+  - bm-set

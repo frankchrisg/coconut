@@ -1,0 +1,61 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Create Apache Kafka configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/kafka.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/kafka_configs/{{ item }}.yaml"
+  loop: "{{ groups['kafka'] }}"
+  loop_control:
+    index_var: my_idx
+  when: inventory_hostname == item and KAFKA_RAFT_OR_SOLO == "kafka"
+  tags:
+  - bm-set
+- name: Create Apache Kafka telegraf configuration file
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/telegraf-container.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/kafka_configs/telegraf_{{ item }}.conf"
+  loop: "{{ groups['kafka'] }}"
+  loop_control:
+    index_var: my_idx
+  when: inventory_hostname == item and KAFKA_RAFT_OR_SOLO == "kafka"
+  tags:
+  - bm-set
+- name: Find files on remote machine
+  find:
+    paths: "{{ MAIN_CONFIG_PATH }}/kafka_configs"
+    patterns: "*.yaml"
+  register: output
+  when: KAFKA_RAFT_OR_SOLO == "kafka"
+  tags:
+  - bm-set
+
+- name: Stop Kafka containers
+  docker_compose:
+    project_src: "{{ MAIN_CONFIG_PATH }}/kafka_configs"
+    files: "{{ item.path | basename }}"
+    remove_volumes: yes
+    state: absent
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  when: KAFKA_RAFT_OR_SOLO == "kafka"
+  tags:
+  - bm-rem
+
+- name: Run Kafka containers  
+  docker_compose:
+    project_src: "{{ MAIN_CONFIG_PATH }}/kafka_configs"
+    files: "{{ item.path | basename }}"
+    recreate: always
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  when: KAFKA_RAFT_OR_SOLO == "kafka"
+  tags:
+  - bm-run
+
+- name: Add IP addresses to container
+  shell: "echo \"echo {{ hostvars[item]['serverip'] }} {{item}} >> /etc/hosts\" | docker exec -i {{ inventory_hostname }} /bin/sh -"
+  when: BRIDGED_MODE and hostvars[item]['serverip'] is defined and KAFKA_RAFT_OR_SOLO == "kafka"
+  loop: "{{ groups.all }}"
+  tags:
+  - bm-set

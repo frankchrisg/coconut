@@ -1,0 +1,54 @@
+- name: Delete directories for node configuration
+  file:
+    path: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}"
+    state: absent
+  tags:
+  - bm-set
+- name: Create directories for node configuration
+  file:
+    path: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/{{ inventory_hostname }}"
+    state: directory
+  tags:
+  - bm-set
+- name: Copy node configuration files
+  synchronize:
+    src: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}"
+    dest: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/generated_files/"
+    rsync_opts:
+      - "{% if DOWNLOAD_CORDA_JAR is defined and DOWNLOAD_CORDA_JAR | bool %}--exclude=corda.jar{% else %}--exlude={% endif %}"
+  tags:
+  - bm-set
+
+- name: Handle corda files
+  block:
+
+    - name: Create corda path
+      file:
+        path: "{{ CORDA_PATH }}"
+        state: directory
+
+    - name: Check if {{ CORDA_PATH }}/{{ CORDA_URL.split('/')[-1] }} exists
+      stat:
+        path: "{{ CORDA_PATH }}/corda.jar"
+      register: stat_result
+    - name: Download corda.jar
+      get_url:
+        url: "{{ CORDA_URL }}"
+        dest: "{{ CORDA_PATH }}/corda.jar"
+        force: "{{ CORDA_FORCE_CLONE }}"
+      when: not stat_result.stat.exists or CORDA_FORCE_CLONE
+    - name: Create directories for jolokia jar
+      file:
+        path: "{{ CORDA_PATH }}/drivers"
+        state: directory
+    - name: Download jolokia jar
+      get_url:
+        url: "{{ JOLOKIA_URL }}/{{ JOLOKIA_JAR }}"
+        dest: "{{ CORDA_PATH }}/drivers"
+  throttle: 1
+  tags:
+  - bm-set
+#- name: Create telegraf.conf
+#  template:
+#    src: "{{ MAIN_CONFIG_PATH }}/telegraf-container.j2"
+#    dest: "{{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}_telegraf.conf"

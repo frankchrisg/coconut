@@ -1,0 +1,24 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Delete directory for corda configuration files
+  file: "path={{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/ state=absent"
+  become: true
+  tags:
+  - bm-set
+- name: Create directory for corda configuration files
+  file: "path={{ CORDA_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/ state=directory"
+  tags:
+  - bm-set
+- name: Get current user
+  command: whoami
+  register: current_user
+  tags: "chown"
+- name: chown directories to current user
+  file:
+    dest: "{{ CHOWN_PATH }}/"
+    owner: "{{ current_user.stdout }}"
+    group: "{{ current_user.stdout }}"
+    recurse: "yes"
+  become: true
+  tags: "chown"

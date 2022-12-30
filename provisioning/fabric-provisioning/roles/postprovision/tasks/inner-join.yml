@@ -1,0 +1,26 @@
+- name: Join channel for all peers (preparation step)
+  debug:
+    msg: >-
+      CORE_PEER_LOCALMSPID={{ item.id }} CORE_PEER_ADDRESS=peer{{ my_idx }}.{{
+      item.domain }}:{{ 7000 + outer_index*100 + my_idx }}
+      CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/{{
+      item.domain }}/users/Admin@{{ item.domain }}/msp
+      CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/{{
+      item.domain }}/peers/peer{{ my_idx }}.{{ item.domain }}/tls/ca.crt
+  register: message
+  loop: "{{ range(0, certificates_config_peer[outer_index].number)|list }}"
+  loop_control:
+    loop_var: inner_item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Join channel for all peers (completion step)
+  shell: >-
+    sleep {{ DEFAULT_SLEEP_TIME }} && echo '{{ x_item[0].msg }} peer channel join -b {{ x_item.1 }}.block' | docker exec -i {{ PREFERRED_CLI_CHANNEL_CREATION }} /bin/bash -
+  loop: "{{ message.results | product(additional_channels)|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: xmy_idx
+  when: "x_item[0].msg.split('/')[-3] not in peers_to_exclude_from_channel_join"
+  tags:
+  - bm-set

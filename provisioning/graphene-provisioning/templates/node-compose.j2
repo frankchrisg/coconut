@@ -1,0 +1,43 @@
+version: "2"
+
+volumes:
+  {{ inventory_hostname }}:
+
+#networks:
+#  {{ NET_NAME }}:
+
+{% if BRIDGED_MODE -%}
+networks:
+  graphene:
+{% endif %}
+
+services:
+  {{ inventory_hostname }}:
+    container_name: {{ inventory_hostname }}
+    image: {{ DOCKERFILE_NAME }}
+    {% if BRIDGED_MODE -%}
+    network_mode: "bridge"
+    ports:
+      - {{ P2P_START_PORT + groups['node'].index(inventory_hostname) }}:{{ P2P_START_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ RPC_START_PORT + groups['node'].index(inventory_hostname) }}:{{ RPC_START_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ RPC_WALLET_HTTP_PORT + groups['node'].index(inventory_hostname) }}:{{ RPC_WALLET_HTTP_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ RPC_WALLET_PORT + groups['node'].index(inventory_hostname) }}:{{ RPC_WALLET_PORT + groups['node'].index(inventory_hostname) }}
+    {% else -%}
+    network_mode: "host"
+    {% endif %}
+
+    restart: always
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+    #    ports:
+    #      - "{{ 8800 + groups['node'].index(inventory_hostname) }}:7054"
+    command: tail -f /dev/null
+    volumes:
+      - {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/:{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/
+      - {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/witness_node:{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/witness_node
+      - {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/cli_wallet:{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/cli_wallet
+      - {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}-api-access.json:{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}-api-access.json
+      - /etc/timezone:/etc/timezone
+      - /etc/security/limits.conf:/etc/security/limits.conf
+      - /etc/sysctl.conf:/etc/sysctl.conf
+      - {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ TESTNET_DIR_NAME }}/{{ inventory_hostname }}/{{ inventory_hostname }}_telegraf.conf:/etc/telegraf/telegraf.conf

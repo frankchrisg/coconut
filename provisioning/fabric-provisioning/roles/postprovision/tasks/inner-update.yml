@@ -1,0 +1,13 @@
+- name: Update channel for all peers (completion step)
+  shell: >-
+    sleep {{ DEFAULT_SLEEP_TIME }} && echo "peer channel update -o {{ PREFERRED_ORDERER_WITH_PORT_TO_CREATE_CHANNEL }} --tls --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/{{
+    PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}/orderers/{{
+    PREFERRED_ORDERER_TO_CREATE_CHANNEL }}/msp/tlscacerts/tlsca.{{
+    PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}-cert.pem -c {{ x_item
+    }} -f channel-artifacts/{{ x_item }}Organization{{ outer_index + 1 }}.tx" | docker exec -i {{ PREFERRED_CLI_CHANNEL_CREATION }} /bin/bash -
+  loop: "{{ additional_channels|flatten(levels=1) }}"
+  loop_control:
+    loop_var: x_item
+    index_var: xmy_idx
+  tags:
+  - bm-set

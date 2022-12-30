@@ -1,0 +1,102 @@
+- name: "Create Channels with cert: /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/{{ PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}/orderers/{{ PREFERRED_ORDERER_TO_CREATE_CHANNEL }}/msp/tlscacerts/tlsca.{{ PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}-cert.pem"
+  shell: >-
+    sleep {{ DEFAULT_SLEEP_TIME }} && echo 'peer channel create -o {{
+    PREFERRED_ORDERER_WITH_PORT_TO_CREATE_CHANNEL }} -c {{ item }} -f
+    channel-artifacts/{{ item }}.tx --tls --cafile
+    /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/{{
+    PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}/orderers/{{
+    PREFERRED_ORDERER_TO_CREATE_CHANNEL }}/msp/tlscacerts/tlsca.{{
+    PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}-cert.pem' | docker exec
+    --interactive  {{ PREFERRED_CLI_CHANNEL_CREATION }} /bin/bash -
+  loop: "{{ additional_channels|flatten(levels=1) }}"
+  tags:
+  - bm-set
+- include_tasks: inner-join.yml
+  loop: "{{ certificates_config_peer }}"
+  loop_control:
+    loop_var: item
+    index_var: outer_index
+  tags:
+  - bm-set
+- include_tasks: inner-update.yml
+  loop: "{{ organizations_config }}"
+  loop_control:
+    loop_var: item
+    index_var: outer_index
+  when: item.type != 'orderer_organization'
+  tags:
+  - bm-set
+- include_tasks: inner-install.yml
+  loop: "{{ certificates_config_peer }}"
+  loop_control:
+    loop_var: item
+    index_var: outer_index
+  tags:
+  - bm-set
+- name: Instantiate Chaincode
+  shell: >-
+    sleep {{ DEFAULT_SLEEP_TIME }} && echo CORE_PEER_LOCALMSPID={{ PREFERRED_CORE_PEER_LOCALMSPID }}
+    CORE_PEER_ADDRESS={{ PREFERRED_CORE_PEER_ADDRESS }}
+    CORE_PEER_MSPCONFIGPATH={{ PREFERRED_CORE_PEER_MSPCONFIGPATH }}
+    CORE_PEER_TLS_ROOTCERT_FILE={{ CORE_PEER_TLS_ROOTCERT_FILE }} "peer
+    chaincode instantiate {{ x_item.1.policy | replace ('!','\"') if x_item.1.policy is defined else ''
+    }} -l {{ CHAINCODE_LANGUAGE }} -o {{
+    PREFERRED_ORDERER_WITH_PORT_TO_CREATE_CHANNEL }} --tls --cafile
+    /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/{{
+    PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}/orderers/{{
+    PREFERRED_ORDERER_TO_CREATE_CHANNEL }}/msp/tlscacerts/tlsca.{{
+    PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}-cert.pem -n {{ 
+    x_item.1.name.split('/')[0] }} -v 1.0 -c '{{ x_item.1.args | replace ('!','\"') }}' -C {{
+    x_item[0] }}" | docker exec -i {{ PREFERRED_CLI_CHANNEL_CREATION }}
+    /bin/bash -
+  loop: "{{ additional_channels|flatten(levels=1) | product(chaincodes)|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: xmy_idx
+  when: "x_item[0] not in channels_to_exclude_from_chaincode"
+  tags:
+  - bm-set
+- name: Debug manual command instantiation
+  debug:
+    msg: >-
+      echo CORE_PEER_LOCALMSPID={{ PREFERRED_CORE_PEER_LOCALMSPID }}
+      CORE_PEER_ADDRESS={{ PREFERRED_CORE_PEER_ADDRESS }}
+      CORE_PEER_MSPCONFIGPATH={{ PREFERRED_CORE_PEER_MSPCONFIGPATH }}
+      CORE_PEER_TLS_ROOTCERT_FILE={{ CORE_PEER_TLS_ROOTCERT_FILE }} "peer
+      chaincode instantiate {{ x_item.1.policy | replace ('!','\"') if x_item.1.policy is defined else ''
+      }} -l {{ CHAINCODE_LANGUAGE }} -o {{
+      PREFERRED_ORDERER_WITH_PORT_TO_CREATE_CHANNEL }} --tls --cafile
+      /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/{{
+      PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}/orderers/{{
+      PREFERRED_ORDERER_TO_CREATE_CHANNEL }}/msp/tlscacerts/tlsca.{{
+      PREFERRED_ORDERER_DOMAIN_ONLY_TO_CREATE_CHANNEL }}-cert.pem -n {{ 
+      x_item.1.name.split('/')[0] }} -v 1.0 -c '{{ x_item.1.args | replace ('!','\"') }}' -C {{
+      x_item[0] }}" | docker exec -i {{ PREFERRED_CLI_CHANNEL_CREATION }}
+      /bin/bash -
+  loop: "{{ additional_channels|flatten(levels=1) | product(chaincodes)|list }}"
+  loop_control:
+    loop_var: x_item
+    index_var: xmy_idx
+  tags:
+  - bm-set
+
+- name: Create update channel settings script
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/updateChannelConfig.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/updateChannelConfig.sh"
+  tags:
+  - bm-set
+  - channel-update
+
+- name: Run channel settings script
+  shell: "sh {{ MAIN_CONFIG_PATH }}/updateChannelConfig.sh"
+  tags:
+  - bm-set
+  - channel-update
+
+#- name: Copy channel settings script to container
+#  shell: "docker cp {{ MAIN_CONFIG_PATH }}/updateChannelConfig.sh {{ PREFERRED_CLI_CHANNEL_CREATION }}:/updateChannelConfig.sh"
+#  tags:
+#  - bm-set
+#  - channel-update
+

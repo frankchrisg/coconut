@@ -1,0 +1,64 @@
+package com.template.states;
+
+import com.template.contracts.KeyValueExtendedContract;
+import net.corda.core.contracts.BelongsToContract;
+import net.corda.core.contracts.ContractState;
+import net.corda.core.identity.AbstractParty;
+import net.corda.core.identity.Party;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@BelongsToContract(com.template.contracts.KeyValueExtendedContract.class)
+public class KeyValueExtendedState implements ContractState {
+    private final Party initParty;
+    private final List<Party> counterParties;
+
+    public String getKey() {
+        return key;
+    }
+
+    public byte[] getValue() {
+        return value;
+    }
+
+    private final String key;
+    private final byte[] value;
+
+    public KeyValueExtendedState(final Party initParty, final List<Party> counterParties, final String key,
+                                 final byte[] value) {
+        this.initParty = initParty;
+        this.counterParties = counterParties;
+        this.key = key;
+        this.value = value;
+    }
+
+    @NotNull
+    @Override
+    public List<AbstractParty> getParticipants() {
+        List<AbstractParty> participants = new ArrayList<>(counterParties);
+        participants.add(initParty);
+        return participants;
+    }
+
+    @BelongsToContract(KeyValueExtendedContract.KeyValueExtendedGetContract.class)
+    public static final class KeyValueExtendedGetState implements ContractState {
+        private final Party initParty;
+        private final List<Party> counterParties;
+
+        public KeyValueExtendedGetState(final Party initParty, final List<Party> counterParties) {
+            this.initParty = initParty;
+            this.counterParties = counterParties;
+        }
+
+        @NotNull
+        @Override
+        public List<AbstractParty> getParticipants() {
+            List<AbstractParty> participants = new ArrayList<>(counterParties);
+            participants.add(initParty);
+            return participants;
+        }
+    }
+
+}

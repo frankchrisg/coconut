@@ -1,0 +1,57 @@
+version: "2"
+
+volumes:
+  ca.{{ item[0][0].1.path.split('/')[-1] }}:
+
+#networks:
+#  {{ NET_NAME }}:
+
+{% if BRIDGED_MODE -%}
+networks:
+  fabric:
+{% endif %}
+
+services:
+  ca.{{ item[0][0].1.path.split('/')[-1] }}:
+    container_name: ca.{{ item[0][0].1.path.split('/')[-1] }}
+    image: hyperledger/fabric-ca
+    {% if BRIDGED_MODE -%}
+    network_mode: "bridge"
+    ports:
+      - {{ 40000 +  groups['ca'].index(inventory_hostname) }}:{{ 40000 + groups['ca'].index(inventory_hostname) }}
+      - {{ 42000 + groups['ca'].index(inventory_hostname) }}:{{ 42000 + groups['ca'].index(inventory_hostname) }}
+#      - {{ 40000 + my_idx }}:{{ 40000 + my_idx }}
+#      - {{ 42000 + my_idx }}:{{ 42000 + my_idx }}
+    {% else -%}
+    network_mode: "host"
+    {% endif %}
+
+    restart: always
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_PORT={{ 40000 + groups['ca'].index(inventory_hostname) }}
+#      - FABRIC_CA_SERVER_PORT={{ 40000 + my_idx }}
+{% if (IMAGE_TAG.split(".")[0] + "." + IMAGE_TAG.split(".")[1])|float >= 1.4 %}
+      # This function is assumed to work with Hyperledger Fabric version 1.4 and newer
+      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:{{ 42000 + groups['ca'].index(inventory_hostname) }}
+#      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:{{ 42000 + my_idx }}
+{% endif %}
+      - FABRIC_CA_SERVER_CA_NAME=ca.{{ item[0][0].1.path.split('/')[-1] }}
+      - FABRIC_CA_SERVER_CA_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.{{ item[0][0].1.path.split('/')[-1] }}-cert.pem
+      - FABRIC_CA_SERVER_CA_KEYFILE=/etc/hyperledger/fabric-ca-server-config/{{ item[1].split('/')[-1] }}
+      - GODEBUG=netdns=go
+    #    ports:
+    #      - "{{ 40000 + groups['ca'].index(inventory_hostname) }}:7054"
+    #      - "{{ 40000 + my_idx }}:7054"
+    command: sh -c 'fabric-ca-server start -b {{ CA_ADMIN_USERNAME }}:{{ CA_ADMIN_PASSWORD }} -d'
+    volumes:
+      - {{ LOCAL_CRYPTO_PATH }}/crypto-config/peerOrganizations/{{ item[0][0].1.path.split('/')[-1] }}/ca/:/etc/hyperledger/fabric-ca-server-config
+      - /etc/timezone:/etc/timezone
+      - /etc/security/limits.conf:/etc/security/limits.conf
+      - /etc/sysctl.conf:/etc/sysctl.conf
+      {% if not BUILD_TELEGRAF -%}
+      - {{ MAIN_CONFIG_PATH }}/telegraf/usr/bin/telegraf:/bin/telegraf
+      {% endif -%}
+      - {{ MAIN_CONFIG_PATH }}/ca_configs/telegraf_ca.{{ item[0][0].1.path.split('/')[-1] }}.conf:/etc/telegraf/telegraf.conf
+      - /var/lib/docker:/var/lib/docker

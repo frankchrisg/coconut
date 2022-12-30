@@ -1,0 +1,86 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Get public keys initial-accounts
+  shell: "/bin/echo '{{ item }}' | awk -F ':' '{ print $3 }' | awk -F ',' 'NR=={{1}}{ print $1 }'"
+  with_lines: "cat {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/initial-accounts-keys_and_addresses.txt"
+  register: public_keys_initial_accounts
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Get addresses initial-accounts
+  shell: " /bin/echo '{{ item }}' | awk -F ':' '{ print $4 }' | awk -F ',' 'NR=={{1}}{ print $1 }'"
+  with_lines: "cat {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/initial-accounts-keys_and_addresses.txt"
+  register: addresses_initial_accounts
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Get private keys initial-accounts
+  shell: "/bin/echo '{{ item }}' | awk -F ':' '{ print $2 }' | awk -F ',' 'NR=={{1}}{ print $1 }'"
+  with_lines: "cat {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/initial-accounts-keys_and_addresses.txt"
+  register: private_keys_initial_accounts
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+
+- name: Get public keys initial-committee
+  shell: "/bin/echo '{{ item }}' | awk -F ':' '{ print $3 }' | awk -F ',' 'NR=={{1}}{ print $1 }'"
+  with_lines: "cat {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/initial-committee-keys_and_addresses.txt"
+  register: public_keys_initial_committee
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Get addresses initial-committee
+  shell: " /bin/echo '{{ item }}' | awk -F ':' '{ print $4 }' | awk -F ',' 'NR=={{1}}{ print $1 }'"
+  with_lines: "cat {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/initial-committee-keys_and_addresses.txt"
+  register: addresses_initial_committee
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Get private keys initial-committee
+  shell: "/bin/echo '{{ item }}' | awk -F ':' '{ print $2 }' | awk -F ',' 'NR=={{1}}{ print $1 }'"
+  with_lines: "cat {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/initial-committee-keys_and_addresses.txt"
+  register: private_keys_initial_committee
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+
+- name: Get public keys initial-witness
+  shell: "/bin/echo '{{ item }}' | awk -F ':' '{ print $3 }' | awk -F ',' 'NR=={{1}}{ print $1 }'"
+  with_lines: "cat {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/initial-witness-keys_and_addresses.txt"
+  register: public_keys_initial_witness
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Get addresses initial-witness
+  shell: " /bin/echo '{{ item }}' | awk -F ':' '{ print $4 }' | awk -F ',' 'NR=={{1}}{ print $1 }'"
+  with_lines: "cat {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/initial-witness-keys_and_addresses.txt"
+  register: addresses_initial_witness
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Get private keys initial-witness
+  shell: "/bin/echo '{{ item }}' | awk -F ':' '{ print $2 }' | awk -F ',' 'NR=={{1}}{ print $1 }'"
+  with_lines: "cat {{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/initial-witness-keys_and_addresses.txt"
+  register: private_keys_initial_witness
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set

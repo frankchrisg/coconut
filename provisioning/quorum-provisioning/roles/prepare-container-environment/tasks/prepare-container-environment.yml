@@ -1,0 +1,138 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Create directories for additional nodes (istanbulbft) and register initial accounts {{ numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int }} times
+  shell: "echo 'mkdir -p /nodes/node-{{ item }}/data/geth && {{ BUILD_PATH }}/geth --datadir /nodes/node-{{ item }} account new  --password passwordfile.txt' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number is defined and CONSENSUS_NAME == 'istanbulbft'
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Create directories for additional nodes (raft) and register initial accounts {{ numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int }} times
+  shell: "echo 'mkdir -p /nodes/node-{{ item }}/data/geth && {{ BUILD_PATH }}/geth --datadir /nodes/node-{{ item }} account new --password passwordfile.txt' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number is defined and CONSENSUS_NAME == 'raft'
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Output status of CONDITION_FOR_KEYS
+  debug:
+    msg: "{{ CONDITION_FOR_KEYS }}"
+  tags:
+  - bm-set
+- name: Get account keys
+  shell: "echo '/bin/bash getKeys.sh' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  register: keys
+  when: CONDITION_FOR_KEYS
+  tags:
+  - bm-set
+- name: Output keys
+  debug:
+    msg: "{{ keys.stdout_lines | list }}"
+  register: keys_content
+  when: CONDITION_FOR_KEYS
+  tags:
+  - bm-set
+- name: Handle enode nodekeys
+  block:
+    - name: Create file on local host for storing keys depending on the given condition, {{ CONDITION_FOR_KEYS }}
+      local_action: lineinfile line="{{ item }}" insertbefore=BOF create="yes" dest="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/enodes_local.json" 
+      loop: "{{ keys_content.msg }}"
+      loop_control:
+        loop_var: item
+        index_var: my_idx
+      when: CONSENSUS_NAME == "raft" or CONSENSUS_NAME == "istanbulbft"
+    - name: Create artifacts for istanbulbft
+      shell: 'echo "/istanbulbft/istanbul setup --num {{ NUMBER_OF_VALIDATORS_ISTANBUL }} --nodes --verbose --quorum --save > istanbul_output.txt && cat istanbul_output.txt | grep Nodekey |  cut -d \\\" -f 4 " | docker exec -i {{ inventory_hostname }} /bin/bash -'
+      when: hostvars[inventory_hostname]['istanbulinitiator'] is defined and hostvars[inventory_hostname]['istanbulinitiator'] | bool and CONSENSUS_NAME == 'istanbulbft'
+      register: nodekeys
+    - name: Create local_nodekeys_validator.txt
+      file:
+        path: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/local_nodekeys_validator.txt"
+        state: touch
+      when: CONSENSUS_NAME == 'raft'
+    - name: Create local_nodekeys_validator.txt (local)
+      local_action: file path="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/local_nodekeys_validator.txt" state="touch"
+      when: CONSENSUS_NAME == 'raft'
+    - name: Put nodekeys to local file (validator)
+      local_action: lineinfile path="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/local_nodekeys_validator.txt" line={{ item }} insertbefore="EOF" create="yes"
+      loop: "{{ nodekeys.stdout_lines | default([]) }}"
+      when: CONSENSUS_NAME == 'istanbulbft'
+    - name: Put nodekeys to local file (validator, backup)
+      local_action: lineinfile path="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/local_nodekeys_validator_backup.txt" line={{ item }} insertbefore="EOF" create="yes"
+      loop: "{{ nodekeys.stdout_lines | default([]) }}"
+      when: CONSENSUS_NAME == 'istanbulbft'
+  throttle: 1
+  tags:
+  - bm-set
+- name: Output local nodekeys (validator)
+  debug:
+    msg: "{{ item }}"
+  with_file:
+    - "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/local_nodekeys_validator.txt"
+  register: localNodekeys
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Output local nodekeys (validator, formatted)
+  debug:
+    msg: "{{ localNodekeys.results[0].item.split('\n') }}" 
+  register: localNodekeys_split
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Output local nodekeys per line (validator)
+  debug:
+    msg: '{{ localNodekeys_split.msg[item | int] }}'
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  when: CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Handle nodekeys (2)
+  block:
+    - name: Write nodekey to container files per node (validator)
+      shell: 'echo "echo \"{{ localNodekeys_split.msg[item | int] }}\" >> /nodes/node-{{ item }}/data/geth/nodekey && echo \"{{ localNodekeys_split.msg[item | int] }}\" >> /nodes/node-{{ item }}/nodekey" | docker exec -i {{ inventory_hostname }} /bin/bash -'
+      loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+      loop_control:
+        loop_var: item
+        index_var: my_idx
+      when: CONSENSUS_NAME == 'istanbulbft'
+    - name: Delete local nodekeys
+      local_action: lineinfile dest="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/local_nodekeys_validator.txt" state=absent regexp="{{ localNodekeys_split.msg[item | int] }}"
+      loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+      loop_control:
+        loop_var: item
+        index_var: my_idx
+      when: CONSENSUS_NAME == 'istanbulbft'
+  throttle: 1
+  tags:
+  - bm-set
+- name: Copy created files from container to host
+  shell: "docker cp {{ inventory_hostname }}:/{{ item }} {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/"
+  loop: "{{ ['genesis.json', 'static-nodes.json'] | flatten(levels=1 )}}"
+  when: hostvars[inventory_hostname]['istanbulinitiator'] is defined and hostvars[inventory_hostname]['istanbulinitiator'] | bool and CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Copy static-nodes to local
+  fetch:
+    src: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes.json"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes.json"
+    flat: yes
+  when: hostvars[inventory_hostname]['istanbulinitiator'] is defined and hostvars[inventory_hostname]['istanbulinitiator'] | bool and CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set
+- name: Copy static-nodes to local (backup process)
+  fetch:
+    src: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes.json"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/static-nodes-backup.json"
+    flat: yes
+  when: hostvars[inventory_hostname]['istanbulinitiator'] is defined and hostvars[inventory_hostname]['istanbulinitiator'] | bool and CONSENSUS_NAME == 'istanbulbft'
+  tags:
+  - bm-set

@@ -1,0 +1,8 @@
+#!/usr/bin/expect
+cd /home/parallels/FINAL_graphene_corda_latest_xxx/diem-prov/diem
+
+set timeout -1
+
+spawn cargo run -p diem-swarm -- --diem-node target/debug/diem-node -n 8 -c /home/parallels/FINAL_graphene_corda_latest_xxx/diem-prov/diem/custconf --node-args "192.168.2.5:60000,192.168.2.6:60001,192.168.2.7:60002,192.168.2.8:60003,192.168.2.9:60004,192.168.2.10:60005,192.168.2.11:60006,192.168.2.12:60007" --node-paths "/home/parallels/FINAL_graphene_corda_latest_xxx/diem-files/node0.node.com/diem-node-0.yaml,/home/parallels/FINAL_graphene_corda_latest_xxx/diem-files/node1.node.com/diem-node-1.yaml,/home/parallels/FINAL_graphene_corda_latest_xxx/diem-files/node2.node.com/diem-node-2.yaml,/home/parallels/FINAL_graphene_corda_latest_xxx/diem-files/node3.node.com/diem-node-3.yaml,/home/parallels/FINAL_graphene_corda_latest_xxx/diem-files/node4.node.com/diem-node-4.yaml,/home/parallels/FINAL_graphene_corda_latest_xxx/diem-files/node5.node.com/diem-node-5.yaml,/home/parallels/FINAL_graphene_corda_latest_xxx/diem-files/node6.node.com/diem-node-6.yaml,/home/parallels/FINAL_graphene_corda_latest_xxx/diem-files/node7.node.com/diem-node-7.yaml" --num-prepare-accounts 60000
+expect "CTRL-C to exit."
+send \x03

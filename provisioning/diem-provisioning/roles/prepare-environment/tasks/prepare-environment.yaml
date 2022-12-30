@@ -1,0 +1,89 @@
+- name: Check diem exists
+  stat:
+    path: "{{ LOCAL_DIEM_PATH }}"
+  register: diem_exists
+  tags:
+  - bm-set
+- name: Clone diem
+  git:
+    repo: "{{ DIEM_URL }}"
+    dest: "{{ LOCAL_DIEM_PATH }}"
+    force: "{{ DIEM_FORCE_CLONE }}"
+    version: "{{ DIEM_VERSION }}"
+  throttle: 5
+  when: not COPY_BINARIES and (not diem_exists.stat.exists or DIEM_FORCE_CLONE)
+  tags:
+  - bm-set
+- name: Copy custom files
+  synchronize:
+    src: "{{ CUSTOM_DIEM_FILES_PATH }}/"
+    dest: "{{ LOCAL_DIEM_PATH }}"
+  when: not COPY_BINARIES
+  tags:
+  - bm-set
+- name: Copy move modules
+  synchronize:
+    src: "{{ MODULE_SRC_PATH }}/"
+    dest: "{{ LOCAL_DIEM_PATH }}/{{ MODULE_TARGET_PATH_FULL }}"
+  when: "not COPY_BINARIES and inventory_hostname not in nodes_to_exclude_from_module"
+  tags:
+  - bm-set
+- name: Create diem binary directory
+  file:
+    path: "{{ LOCAL_DIEM_PATH }}/{{ BINARY_PATH }}"
+    state: directory
+    owner: "{{ current_user.stdout }}"
+    group: "{{ current_user.stdout }}"
+  when: COPY_BINARIES
+  tags:
+  - bm-set
+- name: Copy binaries
+  synchronize:
+    src: "{{ LOCAL_DIEM_PATH }}/{{ BINARY_PATH }}/{{ item }}"
+    dest: "{{ LOCAL_DIEM_PATH }}/{{ BINARY_PATH }}"
+  loop: "{{ BINARIES }}"
+  when: COPY_BINARIES
+  tags:
+  - bm-set
+- name: Get current user
+  command: whoami
+  register: current_user
+  tags:
+  - bm-set
+  - chown
+- name: Add user to sudoers for dev_setup script
+  lineinfile:
+    path: /etc/sudoers
+    state: present
+    line: "{{ current_user.stdout }} ALL=NOPASSWD: /usr/bin/apt-get"
+    insertafter: "EOF"
+    validate: "/usr/sbin/visudo -cf %s"
+    create: yes
+  become: true
+  tags:
+  - bm-set
+- name: Prepare environment
+  shell: echo "yes" | ./scripts/dev_setup.sh && ./scripts/cargo_check_dependencies.sh
+  args:
+    chdir: "{{ LOCAL_DIEM_PATH }}"
+  when: BUILD_BINARIES
+#  become: true
+  tags:
+  - bm-set
+- name: Compile modules
+  shell: . ~/.cargo/env && cargo run {{ MODULE_BUILD_PARAMS }}
+  args:
+    chdir: "{{ LOCAL_DIEM_PATH }}/{{ MODULE_TARGET_PATH }}"
+  when: BUILD_BINARIES
+  tags:
+  - bm-set
+- name: Build binaries
+  shell: . ~/.cargo/env && cargo build {{ BUILD_ARGS }} #&& cargo install --git https://github.com/diem/diem move-cli
+  args:
+    chdir: "{{ LOCAL_DIEM_PATH }}"
+  register: build_success
+  retries: "{{ BUILD_RETRIES }}"
+  until: build_success is success
+  when: BUILD_BINARIES
+  tags:
+  - bm-set

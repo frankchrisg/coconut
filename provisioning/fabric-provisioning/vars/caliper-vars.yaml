@@ -1,0 +1,62 @@
+UPDATE_CALIPER_REPOSITORY: "yes"
+CALIPER_PATH: "/home/user/Schreibtisch"
+# Currently only one Orderer (single mode is supported)
+# Check the todo list on: https://hyperledger.github.io/caliper/docs/Fabric_Configuration.html for changes
+CALIPER_ONLY_ONE_ORDERER: "true"
+
+# Whether Apache ZooKeeper should be used for distributed processing
+CALIPER_USE_ZOOKEEPER: "true"
+# The file containing the Benchmarks should be modified afterwards to match requirements
+CALIPER_BENCHMARK_PATH: "{{ MAIN_CONFIG_PATH }}/caliper_configs/caliper-config.yaml"
+# Any Apache ZooKeeper server (default the first server from the Ansible hosts file)
+CALIPER_ZOOKEEPER_SERVER: "{{ groups['zookeeper'].0 }}:2200"
+
+# The Node.js Hyperledger Fabric and Fabric CA dependencies to install
+CALIPER_FAB_DEPS: "fabric-v1.3-deps"
+
+CALIPER_PREFERRED_PEER: "peerone.com"
+CALIPER_PREFERRED_ORDERER: "ordererone.com"
+
+# The default simple Chaincode will be used for initial testing
+CALIPER_CHAINCODE_NAME: "simple"
+
+CALIPER_CHAINCODE_CHANNEL: "testchannel"
+CALIPER_OPEN_CHANNEL: "testchannel"
+CALIPER_QUERY_CHANNEL: "testchannel"
+
+CALIPER_NUMBER_OF_CLIENTS: 10
+
+# instantiate should be used in order to instantiate the Chaincode
+# upgrade should be used for further manual modification of Hyperledger Caliper.
+CALIPER_INSTANTIATE_OR_UPGRADE_CC: "instantiate"
+
+"caliper_chaincodes": [
+    {
+      "name": "simple/go",
+      # ! is substituted with \\" during executions
+      "args": "{!Args!: [!init!]}",
+      "language": "{{ CHAINCODE_LANGUAGE }}",
+      "id": "simple",
+      "path": "contract/fabric/simple/go",
+      "version": "v0",
+    },
+  ]
+
+# Remove chaincode is defined in common-vars.yaml
+# Can be a further improvement
+# "caliper_remove_chaincodes":
+#  ["simple"]
+
+# General information
+# Just a description of the network, not really mandatory for a functioning execution
+
+# This value can not be chosen arbitrarily as it defines the version of Hyperledger Fabric
+# If you set this to 1.0 or anything which looks like an old version legacy mode will be enabled
+# Therefore we set this to the real version
+VERSION: "1.3"
+SIZE: "4 Peers, 1 Orderer, 2 Organizations"
+ORDERER: "Solo"
+DISTRIBUTION: "Distributed environment"
+DETAILS: "Currently none"
+
+NUMBER_OF_ORDERER_ORGS: 2

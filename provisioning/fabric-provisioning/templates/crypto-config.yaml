@@ -1,0 +1,44 @@
+# This file represents an example configuration and should not be used in productions environments
+# If you want to use certificates in production environments it is advised to build a custom network
+# which is specialized in building customized certificates for the participants in the network
+#
+# This configuration files is used on the present scenario. It is used to create certificates which
+# are following a specific structure and are generated using the structure of this configuration #file. This configuration file, providing the template is reducing the effort to manually create certificates enormously
+#
+# For further information on this configuration file and the belonging binary, please see: https://hyperledger-fabric.readthedocs.io/en/latest/commands/cryptogen.html
+
+OrdererOrgs:
+  - Name: Orderer
+    Domain: ordererone.com
+    Specs:
+      - Hostname: orderer{{.Index}}
+    Template:
+      # counting from start to (count - 1) starting from 0
+      Count: 3
+      Start: 0
+      Hostname: orderer{{.Index}}
+      SANS:
+        - "localhost"
+        - "127.0.0.1"
+        - "Orderer"
+        - "10.211.55.31"
+        
+
+PeerOrgs:
+  - Name: Peer
+    Domain: peerone.com
+    Template:
+      # counting from start to (count - 1) starting from 0
+      Count: 32
+      Start: 0
+      Hostname: peer{{.Index}}
+      SANS:
+        - "localhost"
+        - "127.0.0.1"
+        - "Orderer"
+        - "10.211.55.31"
+
+
+    # The number of additional users, irrelevant in the present scenario.
+    Users:
+      Count: 1

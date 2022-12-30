@@ -1,0 +1,13 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Create docker compose files
+  template: 
+    src: "{{ MAIN_CONFIG_PATH }}/node-compose.j2"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}_compose.yaml"
+  loop: "{{ groups['node'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set

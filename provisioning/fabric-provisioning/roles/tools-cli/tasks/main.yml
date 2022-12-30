@@ -1,0 +1,7 @@
+- name: Pull tools (cli) image
+  docker_image:
+    name: "hyperledger/fabric-tools:{{ IMAGE_TAG }}"
+    tag: "fabric-tools"
+  tags:
+  - bm-set
+- import_tasks: provide-cli.yaml

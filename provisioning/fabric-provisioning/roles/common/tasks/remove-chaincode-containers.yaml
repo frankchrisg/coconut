@@ -1,0 +1,24 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Stop chaincode containers
+  shell: "docker stop $(docker ps -a | grep {{ item }} | awk '{print $1}')"
+  loop: "{{ remove_chaincodes|flatten(levels=1) }}"
+  register: rcfail
+  failed_when: rcfail.rc != 0 and rcfail.rc != 1
+  tags:
+  - bm-set
+- name: Remove chaincode containers
+  shell: "docker rm $(docker ps -a | grep {{ item }} | awk '{print $1}')"
+  loop: "{{ remove_chaincodes|flatten(levels=1) }}"
+  register: rcfail
+  failed_when: rcfail.rc != 0 and rcfail.rc != 1
+  tags:
+  - bm-set
+- name: Delete chaincode containers
+  shell: "docker rmi -f $(docker images | grep {{ item }} | awk '{print $3}')"
+  loop: "{{ remove_chaincodes|flatten(levels=1) }}"
+  register: rcfail
+  failed_when: rcfail.rc != 0 and rcfail.rc != 1
+  tags:
+  - bm-set

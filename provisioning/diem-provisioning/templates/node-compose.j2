@@ -1,0 +1,56 @@
+version: "2"
+
+volumes:
+  {{ inventory_hostname }}:
+
+#networks:
+#  {{ NET_NAME }}:
+
+{% if BRIDGED_MODE -%}
+networks:
+  overlaynetwork_diem:
+    external: true
+    driver: overlay
+{% endif %}
+
+services:
+  {{ inventory_hostname }}:
+    container_name: {{ inventory_hostname }}
+    image: {{ DOCKERFILE_NAME }}
+    {% if BRIDGED_MODE -%}
+    networks:
+      overlaynetwork_diem:
+        ipv4_address: {{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(inventory_hostname) + 3) }}
+#    network_mode: "bridge"
+    ports:
+      - {{ COMMUNICATION_START_PORT + groups['node'].index(inventory_hostname) }}:{{ COMMUNICATION_START_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ ADMISSION_CONTROL_NODE_DEBUG_START_PORT + groups['node'].index(inventory_hostname) }}:{{ ADMISSION_CONTROL_NODE_DEBUG_START_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ METRICS_SERVER_START_PORT + groups['node'].index(inventory_hostname) }}:{{ METRICS_SERVER_START_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ PUBLIC_METRICS_SERVER_START_PORT + groups['node'].index(inventory_hostname) }}:{{ PUBLIC_METRICS_SERVER_START_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ FULL_NODE_LISTEN_START_PORT + groups['node'].index(inventory_hostname) }}:{{ FULL_NODE_LISTEN_START_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ FULL_NODE_LISTEN_START_PORT_PRIVATE + groups['node'].index(inventory_hostname) }}:{{ FULL_NODE_LISTEN_START_PORT_PRIVATE + groups['node'].index(inventory_hostname) }}
+      - {{ JSON_RPC_START_PORT + groups['node'].index(inventory_hostname) }}:{{ JSON_RPC_START_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ API_START_PORT + groups['node'].index(inventory_hostname) }}:{{ API_START_PORT + groups['node'].index(inventory_hostname) }} 
+      - {{ STORAGE_START_PORT + groups['node'].index(inventory_hostname) }}:{{ STORAGE_START_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ STORAGE_BACKUP_START_PORT + groups['node'].index(inventory_hostname) }}:{{ STORAGE_BACKUP_START_PORT + groups['node'].index(inventory_hostname) }}
+      - {{ VALIDATOR_START_PORT + groups['node'].index(inventory_hostname) }}:{{ VALIDATOR_START_PORT + groups['node'].index(inventory_hostname) }}
+      {% if hostvars[inventory_hostname]['provide_faucet'] is defined and hostvars[inventory_hostname]['provide_faucet'] | bool %}- {{ FAUCET_START_PORT + groups['node'].index(inventory_hostname) }}:{{ FAUCET_START_PORT + groups['node'].index(inventory_hostname) }}{% endif %}
+    {% else -%}
+    network_mode: "host"
+    {% endif %}
+
+    restart: always
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+    #    ports:
+    #      - "{{ 8800 + groups['node'].index(inventory_hostname) }}:7054"
+    command: tail -f /dev/null
+    volumes:
+      - {{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}/:{{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}/
+      - /etc/timezone:/etc/timezone
+      - /etc/security/limits.conf:/etc/security/limits.conf
+      - /etc/sysctl.conf:/etc/sysctl.conf
+      - {{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}/diem-node-{{ groups['node'].index(inventory_hostname) }}_telegraf.conf:/etc/telegraf/telegraf.conf
+      - {{ LOCAL_DIEM_PATH }}/{{ BINARY_PATH }}/diem-node:{{ LOCAL_DIEM_PATH }}/{{ BINARY_PATH }}/diem-node
+      - {{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}/diem-node-{{ groups['node'].index(inventory_hostname) }}-start-script.sh:{{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}/diem-node-{{ groups['node'].index(inventory_hostname) }}-start-script.sh
+      {% if hostvars[inventory_hostname]['provide_faucet'] is defined and hostvars[inventory_hostname]['provide_faucet'] | bool %}- {{ LOCAL_DIEM_PATH }}/{{ BINARY_PATH }}/diem-faucet:{{ LOCAL_DIEM_PATH }}/{{ BINARY_PATH }}/diem-faucet{% endif %}

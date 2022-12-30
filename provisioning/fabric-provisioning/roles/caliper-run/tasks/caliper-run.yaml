@@ -1,0 +1,26 @@
+- name: Debug message
+  debug:
+    msg: "It is highly advised to modify the benchmark configuration file ({{ CALIPER_BENCHMARK_PATH }}) due to the flexible structure"
+- name: Pause
+  pause:
+    prompt: "Did you modify the Caliper test scenario file: {{ CALIPER_BENCHMARK_PATH }}? If you want to use ZooKeeper with Caliper please run the Playbook run-caliper-zookeeper first. Please confirm by pressing ENTER"
+- name: Pause
+  pause:
+    prompt: "Please set at least one master server when running distributed through Apache ZooKeeper. Please confirm by pressing ENTER"
+  when: CALIPER_USE_ZOOKEEPER == "true"
+- name: "Run Caliper with command: node {{ CALIPER_PATH }}/caliper/scripts/main.js -n {{ MAIN_CONFIG_PATH }}/caliper_configs/caliper.json -c {{ CALIPER_BENCHMARK_PATH }} (this may take a long time)"
+  shell: "node {{ CALIPER_PATH }}/caliper/scripts/main.js -n {{ MAIN_CONFIG_PATH }}/caliper_configs/caliper.json -c {{ CALIPER_BENCHMARK_PATH }}"
+  when: (hostvars[inventory_hostname]['master'] is defined and hostvars[inventory_hostname]['master'] | bool and CALIPER_USE_ZOOKEEPER == "true") or CALIPER_USE_ZOOKEEPER == "false"
+  register: output
+- name: "Output"
+  debug:
+    msg: "{{ output.stdout_lines }}"
+  when: output.stdout_lines is defined
+- name: "Output error"
+  debug:
+    msg: "{{ output.stderr_lines }}"
+  when: output.stderr_lines is defined
+- name: "Stop all NodeJS Apache ZooKeeper processes started by Caliper (distributed clients)"
+  shell: "kill -9 $(ps aux | grep 'node {{ CALIPER_PATH }}/caliper/src/comm/client/zoo-client.js' | awk '{print $2}')"
+  register: rcfail
+  failed_when: rcfail.rc != 0 and rcfail.rc != -9

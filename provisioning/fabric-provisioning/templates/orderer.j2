@@ -1,0 +1,89 @@
+version: '2'
+
+volumes:
+  {{ item.hostname }}{{ groups['orderer'].index(inventory_hostname) }}.{{ item.domain }}:
+#  {{ item.hostname }}{{ my_idx }}.{{ item.domain }}:
+
+#networks:
+#  {{ NET_NAME }}:
+
+{% if BRIDGED_MODE -%}
+networks:
+  fabric:
+{% endif %}
+
+services:
+  {{ item.hostname }}{{ groups['orderer'].index(inventory_hostname) }}.{{ item.domain }}:
+    container_name: {{ item.hostname }}{{ groups['orderer'].index(inventory_hostname) }}.{{ item.domain }}
+#  {{ item.hostname }}{{ my_idx }}.{{ item.domain }}:
+#    container_name: {{ item.hostname }}{{ my_idx }}.{{ item.domain }}
+    image: hyperledger/fabric-orderer:{{ IMAGE_TAG }}
+    {% if BRIDGED_MODE -%}
+    network_mode: "bridge"
+    ports:
+      - {{ ORDERER_START_PORT + outer_index*100 + groups['orderer'].index(inventory_hostname) }}:{{ ORDERER_START_PORT + outer_index*100 + groups['orderer'].index(inventory_hostname) }}
+      - {{ 62000 + outer_index*100 + groups['orderer'].index(inventory_hostname) }}:{{ 62000 + outer_index*100 + groups['orderer'].index(inventory_hostname) }}
+      - {{ 14000 + outer_index*100 + groups['orderer'].index(inventory_hostname) }}:{{ 14000 + outer_index*100 + groups['orderer'].index(inventory_hostname) }}
+#      - {{ ORDERER_START_PORT + outer_index*100 + my_idx }}:{{ ORDERER_START_PORT + outer_index*100 + my_idx }}
+#      - {{ 62000 + outer_index*100 + my_idx }}:{{ 62000 + outer_index*100 + my_idx }}
+#      - {{ 14000 + outer_index*100 + my_idx }}:{{ 14000 + outer_index*100 + my_idx }}
+    {% else -%}
+    network_mode: "host"
+    {% endif %}
+
+    restart: always
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+{% if (IMAGE_TAG.split(".")[0] + "." + IMAGE_TAG.split(".")[1])|float >= 1.4 %}
+      # This function is assumed to work with Hyperledger Fabric version 1.4 and newer
+      - ORDERER_METRICS_STATSD_ADDRESS={{ groups['statsd'].0 }}:8125
+      - ORDERER_METRICS_PROVIDER=statsd
+      - ORDERER_METRICS_STATSD_PREFIX={{ item.hostname }}{{ groups['orderer'].index(inventory_hostname) }}.{{ item.domain }}
+      - ORDERER_OPERATIONS_LISTENADDRESS=0.0.0.0:{{ 62000 + outer_index*100 + groups['orderer'].index(inventory_hostname) }}
+#      - ORDERER_METRICS_STATSD_PREFIX={{ item.hostname }}{{ my_idx }}.{{ item.domain }}
+#      - ORDERER_OPERATIONS_LISTENADDRESS=0.0.0.0:{{ 62000 + outer_index*100 + my_idx }}
+{% endif %}
+      - ORDERER_GENERAL_LOGLEVEL=DEBUG
+      # DEBUG
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_LISTENPORT={{ ORDERER_START_PORT + outer_index*100 + groups['orderer'].index(inventory_hostname) }}
+#      - ORDERER_GENERAL_LISTENPORT={{ ORDERER_START_PORT + outer_index*100 + my_idx }}
+      - ORDERER_GENERAL_GENESISMETHOD=file
+      - ORDERER_GENERAL_PROFILE_ADDRESS=0.0.0.0:{{ 14000 + outer_index*100 + groups['orderer'].index(inventory_hostname) }}
+#      - ORDERER_GENERAL_PROFILE_ADDRESS=0.0.0.0:{{ 14000 + outer_index*100 + my_idx }}
+      - ORDERER_GENERAL_PROFILE_ENABLED=true
+      - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/genesis.block
+      - ORDERER_GENERAL_LOCALMSPID={{ item.id }}
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      # If you use a custom GO version set this value, see https://golang.org/pkg/net/
+      - GODEBUG=netdns=go
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric
+    command: sh -c 'orderer'
+#    command: orderer
+    volumes:
+    - {{ LOCAL_CRYPTO_PATH }}/channel-artifacts/genesis.block:/var/hyperledger/orderer/genesis.block
+    - {{ LOCAL_CRYPTO_PATH }}/crypto-config/ordererOrganizations/{{ item.domain }}/orderers/{{ item.hostname }}{{ groups['orderer'].index(inventory_hostname) }}.{{ item.domain }}/msp:/var/hyperledger/orderer/msp
+    - {{ LOCAL_CRYPTO_PATH }}/crypto-config/ordererOrganizations/{{ item.domain }}/orderers/{{ item.hostname }}{{ groups['orderer'].index(inventory_hostname) }}.{{ item.domain }}/tls/:/var/hyperledger/orderer/tls
+#    - {{ LOCAL_CRYPTO_PATH }}/crypto-config/ordererOrganizations/{{ item.domain }}/orderers/{{ item.hostname }}{{ my_idx }}.{{ item.domain }}/msp:/var/hyperledger/orderer/msp
+#    - {{ LOCAL_CRYPTO_PATH }}/crypto-config/ordererOrganizations/{{ item.domain }}/orderers/{{ item.hostname }}{{ my_idx }}.{{ item.domain }}/tls/:/var/hyperledger/orderer/tls
+    - {{ item.hostname }}{{ groups['orderer'].index(inventory_hostname) }}.{{ item.domain }}:/var/hyperledger/production/orderer
+#    - {{ item.hostname }}{{ my_idx }}.{{ item.domain }}:/var/hyperledger/production/orderer
+    - /etc/timezone:/etc/timezone
+    - /etc/security/limits.conf:/etc/security/limits.conf
+    - /etc/sysctl.conf:/etc/sysctl.conf
+    {% if not BUILD_TELEGRAF -%}
+    - {{ MAIN_CONFIG_PATH }}/telegraf/usr/bin/telegraf:/bin/telegraf
+    {% endif -%}
+    - {{ MAIN_CONFIG_PATH }}/orderer_configs/telegraf_orderer{{ groups['orderer'].index(inventory_hostname) }}.{{ item.domain }}.conf:/etc/telegraf/telegraf.conf
+#    - {{ MAIN_CONFIG_PATH }}/orderer_configs/telegraf_orderer{{ my_idx }}.{{ item.domain }}.conf:/etc/telegraf/telegraf.conf
+    - /var/lib/docker:/var/lib/docker
+#    ports:
+#      - {{ ORDERER_START_PORT + outer_index*100 + groups['orderer'].index(inventory_hostname) }}:7050
+#      - {{ ORDERER_START_PORT + outer_index*100 + my_idx }}:7050

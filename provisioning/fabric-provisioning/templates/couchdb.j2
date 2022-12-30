@@ -1,0 +1,57 @@
+version: "2"
+
+volumes:
+  couchdb{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}:
+#  couchdb{{ my_idx }}.{{ item.domain }}:
+
+#networks:
+#  {{ NET_NAME }}:
+
+{% if BRIDGED_MODE -%}
+networks:
+  fabric:
+{% endif %}
+
+services:
+  couchdb{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}:
+    container_name: couchdb{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}
+#  couchdb{{ my_idx }}.{{ item.domain }}:
+#    container_name: couchdb{{ my_idx }}.{{ item.domain }}
+    image: hyperledger/fabric-couchdb
+    {% if BRIDGED_MODE -%}
+    network_mode: "bridge"
+    ports:
+      - {{ 4000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}:{{ 4000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+      - {{ 5000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}:{{ 5000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+      - {{ 6000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}:{{ 6000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}
+#      - {{ 4000 + outer_index*100 + my_idx }}:{{ 4000 + outer_index*100 + my_idx }}
+#      - {{ 5000 + outer_index*100 + my_idx }}:{{ 5000 + outer_index*100 + my_idx }}
+#      - {{ 6000 + outer_index*100 + my_idx }}:{{ 6000 + outer_index*100 + my_idx }}
+    {% else -%}
+    network_mode: "host"
+    {% endif %}
+
+    restart: always
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+  # Username and password for Apache CouchDB, adjust if needed
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=admin
+      - GODEBUG=netdns=go
+  #      ports:
+  #        - {{ 5000 + outer_index*100 + groups['peer'].index(inventory_hostname) }}:5984
+  #        - {{ 5000 + outer_index*100 + my_idx }}:5984
+  #      networks:
+  #        - {{ NET_NAME }}
+    volumes:
+      - {{ MAIN_CONFIG_PATH }}/couchdb_configs/couchdb{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}_default.ini:/opt/couchdb/etc/default.ini
+#      - {{ MAIN_CONFIG_PATH }}/couchdb_configs/couchdb{{ my_idx }}.{{ item.domain }}_default.ini:/opt/couchdb/etc/default.ini
+      - /etc/timezone:/etc/timezone
+      - /etc/security/limits.conf:/etc/security/limits.conf
+      - /etc/sysctl.conf:/etc/sysctl.conf
+      {% if not BUILD_TELEGRAF -%}
+      - {{ MAIN_CONFIG_PATH }}/telegraf/usr/bin/telegraf:/bin/telegraf
+      {% endif -%}
+      - {{ MAIN_CONFIG_PATH }}/couchdb_configs/telegraf_couchdb{{ groups['peer'].index(inventory_hostname) }}.{{ item.domain }}.conf:/etc/telegraf/telegraf.conf
+#      - {{ MAIN_CONFIG_PATH }}/couchdb_configs/telegraf_couchdb{{ my_idx }}.{{ item.domain }}.conf:/etc/telegraf/telegraf.conf
+      - /var/lib/docker:/var/lib/docker

@@ -1,0 +1,289 @@
+package com.template.flows;
+
+import co.paralleluniverse.fibers.Suspendable;
+import com.template.contracts.IOContract;
+import com.template.states.IOState;
+import net.corda.core.contracts.*;
+import net.corda.core.flows.*;
+import net.corda.core.identity.Party;
+import net.corda.core.node.ServiceHub;
+import net.corda.core.node.services.TransactionStorage;
+import net.corda.core.node.services.Vault;
+import net.corda.core.node.services.vault.PageSpecification;
+import net.corda.core.node.services.vault.QueryCriteria;
+import net.corda.core.node.services.vault.Sort;
+import net.corda.core.transactions.SignedTransaction;
+import net.corda.core.transactions.TransactionBuilder;
+import net.corda.core.utilities.ProgressTracker;
+
+import java.io.IOException;
+import java.security.PublicKey;
+import java.security.SignatureException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+@InitiatingFlow
+@StartableByRPC
+public class IOFlow extends FlowLogic<Void> {
+
+    private static final String chars = "!\"#$%&'()*+,-./0123456789:;" +
+            "<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+
+    private final String[] args;
+    private final String function;
+    private Party notary;
+    private List<Party> counterParties;
+
+    private ProgressTracker.Step write;
+    private ProgressTracker.Step scan;
+    private ProgressTracker.Step revertScan;
+    private ProgressTracker progressTracker;
+
+    private QueryCriteria.VaultQueryCriteria vaultQueryCriteria = new QueryCriteria.VaultQueryCriteria();
+    private PageSpecification pageSpecification = new PageSpecification();
+    private Sort sort = new Sort(Collections.emptySet());
+
+    @Override
+    public ProgressTracker getProgressTracker() {
+        return this.progressTracker;
+    }
+
+    public IOFlow(final String functionConstructor, final List<String> args, final Party notaryConstructor,
+                  final List<Party> counterPartiesConstructor,
+                  final QueryCriteria.VaultQueryCriteria queryCriteriaConstructor,
+                  final PageSpecification pageSpecificationConstructor, final Sort sortConstructor) {
+
+        if (queryCriteriaConstructor != null) {
+            vaultQueryCriteria = queryCriteriaConstructor;
+        }
+        if (pageSpecificationConstructor != null) {
+            pageSpecification = pageSpecificationConstructor;
+        }
+        if (sortConstructor != null) {
+            sort = sortConstructor;
+        }
+
+        if (notaryConstructor != null) {
+            notary = notaryConstructor;
+        }
+        if (counterPartiesConstructor != null) {
+            counterParties = counterPartiesConstructor;
+        }
+
+        function = functionConstructor;
+
+        this.args = args.toArray(new String[0]);
+
+        String signature = this.args[this.args.length - 1];
+
+        if ("Write".equals(function)) {
+            write = new ProgressTracker.Step("storage/write " + signature);
+            progressTracker = new ProgressTracker(write);
+        } else if ("Scan".equals(function)) {
+            scan = new ProgressTracker.Step("storage/scan " + signature);
+            progressTracker = new ProgressTracker(scan);
+        } else if ("RevertScan".equals(function)) {
+            revertScan = new ProgressTracker.Step("storage/revertScan " + signature);
+            progressTracker = new ProgressTracker(revertScan);
+        }
+    }
+
+    @Suspendable
+    private StateAndRef<IOState> getByKey(String key) {
+
+        Vault.Page<IOState> ioStatePage = getServiceHub().getVaultService().queryBy(IOState.class,
+                vaultQueryCriteria, pageSpecification, sort);
+
+        List<StateAndRef<IOState>> states = ioStatePage.getStates();
+
+        //return states.filter(state -> key.equals(state.getState().getData().getsK())).findAny().orElse(null);
+
+        for (final StateAndRef<IOState> state : states) {
+            if (key.equals(state.getState().getData().getsK())) {
+                return state;
+            }
+        }
+        return null;
+
+        /*ServiceHub serviceHub = getServiceHub();
+        serviceHub.getValidatedTransactions().track().getSnapshot().forEach(
+                s -> {
+                    try {
+                        List<StateAndRef<IOState>> ioStates =
+                                s.toLedgerTransaction(serviceHub, true)
+                                .filterInRefs(IOState.class,
+                                x -> key.equals(x.getsK()));
+                    } catch (SignatureException | AttachmentResolutionException | TransactionResolutionException ex) {
+                        getLogger().error("Error while handling flow, get " + ex.getMessage());
+                    }
+                }
+        );*/
+
+    }
+
+    @Suspendable
+    private void write(String[] args) throws FlowException {
+        if (args.length != 4) {
+            throw new FlowException("Call to Write must have 4 parameters");
+        }
+
+        int size = Integer.parseInt(args[0]);
+        int startKey = Integer.parseInt(args[1]);
+        int retLen = Integer.parseInt(args[2]);
+
+        //ByteArrayOutputStream stateArr = new ByteArrayOutputStream();
+        List<byte[]> stateArr = new ArrayList<>();
+
+                    TransactionBuilder txBuilder = new TransactionBuilder(notary);
+
+        for (int i = 0; i < size; i++) {
+            String sK = String.valueOf(startKey + i);
+            byte[] val = getVal(startKey + i, retLen);
+
+            IOState outputState = new IOState(getOurIdentity(), counterParties, sK, val);
+
+            StateAndRef<IOState> byKey = getByKey(sK);
+            if (byKey != null) {
+                txBuilder.addInputState(byKey);
+            }
+
+            txBuilder.addOutputState(outputState);
+
+            /*try {
+                stateArr.write(val);
+            } catch (IOException ex) {
+                throw new FlowException("Unable to create byte array");
+            }*/
+            stateArr.add(val);
+        }
+        /*try {
+            stateArr.close();
+        } catch (IOException ex) {
+            throw new FlowException("Unable to close stream");
+        }*/
+
+                    List<PublicKey> requiredSigners = new ArrayList<>();
+                    counterParties.forEach(party -> requiredSigners.add(party.getOwningKey()));
+                    Command<IOContract.Write> command = new Command<>(new IOContract.Write(), requiredSigners);
+                    txBuilder.addCommand(command);
+
+                    SignedTransaction signedTx = getServiceHub().signInitialTransaction(txBuilder);
+                    List<FlowSession> sessionList = new ArrayList<>();
+                    counterParties.forEach(party -> sessionList.add(initiateFlow(party)));
+
+                    SignedTransaction fullySignedTx;
+                    try {
+                        fullySignedTx = subFlow(new CollectSignaturesFlow(
+                                signedTx, sessionList, CollectSignaturesFlow.tracker()));
+                        subFlow(new FinalityFlow(fullySignedTx, sessionList));
+                    } catch (FlowException ex) {
+                        getLogger().error("Error while handling flow " + ex.getMessage());
+                        throw new FlowException("Error while handling flow " + this.getRunId() + " " + ex.getMessage());
+                    }
+
+        progressTracker.setCurrentStep(write);
+    }
+
+    @Suspendable
+    private byte[] getVal(int k, int retLen) {
+        StringBuilder stringBuilder = new StringBuilder();
+        for (int i = 0; i < retLen; i++) {
+            stringBuilder.append(chars.toCharArray()[(k + i) % (chars.length())]);
+        }
+        return stringBuilder.toString().getBytes();
+    }
+
+    @Suspendable
+    private void scan(String[] args) throws FlowException {
+        if (args.length != 3) {
+            throw new FlowException("Call to Scan must have 3 parameters");
+        }
+
+        int size = Integer.parseInt(args[0]);
+        int startKey = Integer.parseInt(args[1]);
+
+        //ByteArrayOutputStream stateArr = new ByteArrayOutputStream();
+        List<byte[]> stateArr = new ArrayList<>();
+        for (int i = 0; i < size; i++) {
+            String sK = String.valueOf(startKey + i);
+            StateAndRef<IOState> byKey = getByKey(sK);
+
+            if(byKey == null) {
+                        throw new FlowException("Error while handling flow, not found scan " + this.getRunId());
+            }
+
+            //try {
+                if(byKey != null) {
+                    stateArr.add(byKey.getState().getData().getVal());
+                    //stateArr.write(byKey.getState().getData().getVal());
+                }
+            /*    } catch (IOException ex) {
+                throw new FlowException("Unable to create byte array");
+            }*/
+        }
+        /*try {
+            stateArr.close();
+        } catch (IOException ex) {
+            throw new FlowException("Unable to close stream");
+        }*/
+        progressTracker.setCurrentStep(scan);
+    }
+
+    @Suspendable
+    private void revertScan(String[] args) throws FlowException {
+        if (args.length != 3) {
+            throw new FlowException("Call to RevertScan must have 3 parameters");
+        }
+
+        int size = Integer.parseInt(args[0]);
+        int startKey = Integer.parseInt(args[1]);
+
+        //ByteArrayOutputStream stateArr = new ByteArrayOutputStream();
+        List<byte[]> stateArr = new ArrayList<>();
+        for (int i = 0; i < size; i++) {
+            String sK = String.valueOf(startKey + size - i - 1);
+            StateAndRef<IOState> byKey = getByKey(sK);
+
+                        if(byKey == null) {
+                                    throw new FlowException("Error while handling flow, not found revertScan " + this.getRunId());
+                        }
+
+            //try {
+                if(byKey != null) {
+                    stateArr.add(byKey.getState().getData().getVal());
+                    //stateArr.write(byKey.getState().getData().getVal());
+                }
+            /*} catch (IOException ex) {
+                throw new FlowException("Unable to create byte array");
+            }*/
+        }
+        /*try {
+            stateArr.close();
+        } catch (IOException ex) {
+            throw new FlowException("Unable to close stream");
+        }*/
+        progressTracker.setCurrentStep(revertScan);
+    }
+
+    @Suspendable
+    @Override
+    public Void call() throws FlowException {
+
+        if ("Write".equals(function)) {
+            write(args);
+            return null;
+        }
+        if ("Scan".equals(function)) {
+            scan(args);
+            return null;
+        }
+        if ("RevertScan".equals(function)) {
+            revertScan(args);
+            return null;
+        }
+
+        throw new FlowException("Not yet implemented function called");
+
+    }
+}

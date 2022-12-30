@@ -1,0 +1,81 @@
+package com.template.flows;
+
+import co.paralleluniverse.fibers.Suspendable;
+import net.corda.core.flows.FlowException;
+import net.corda.core.flows.FlowLogic;
+import net.corda.core.flows.InitiatingFlow;
+import net.corda.core.flows.StartableByRPC;
+import net.corda.core.identity.Party;
+import net.corda.core.utilities.ProgressTracker;
+
+import java.util.List;
+
+@InitiatingFlow
+@StartableByRPC
+public class StaticCheckFlow extends FlowLogic<Void> {
+
+    private final String[] args;
+    private final String function;
+    private Party notary;
+    private List<Party> counterParties;
+
+    private ProgressTracker progressTracker;
+
+    private static boolean checkVar = true;
+
+    @Override
+    public ProgressTracker getProgressTracker() {
+        return this.progressTracker;
+    }
+
+    public StaticCheckFlow(final String functionConstructor, final List<String> args, final Party notaryConstructor,
+                           final List<Party> counterPartiesConstructor) {
+
+        if (notaryConstructor != null) {
+            notary = notaryConstructor;
+        }
+        if (counterPartiesConstructor != null) {
+            counterParties = counterPartiesConstructor;
+        }
+
+        function = functionConstructor;
+
+        this.args = args.toArray(new String[0]);
+
+    }
+
+    @Suspendable
+    private void checkVarSet(String val) {
+        checkVar = Boolean.parseBoolean(val);
+        getLogger().info("New checkVar: ");
+        getLogger().info(String.valueOf(checkVar));
+    }
+
+    @Suspendable
+    private void checkVarGet() {
+        getLogger().info("checkVar: ");
+        getLogger().info(String.valueOf(checkVar));
+        if (checkVar) {
+            //return ("true".getBytes());
+        } else {
+            //return ("false".getBytes());
+        }
+    }
+
+    @Suspendable
+    @Override
+    public Void call() throws FlowException {
+
+        if ("CheckVarSet".equals(function)) {
+            checkVarSet(args[0]);
+            return null;
+        }
+        if ("CheckVarGet".equals(function)) {
+            checkVarGet();
+            return null;
+        }
+
+        throw new FlowException("Not yet implemented function called");
+
+    }
+}

@@ -1,0 +1,51 @@
+package com.template.states;
+
+import net.corda.core.contracts.BelongsToContract;
+import net.corda.core.contracts.ContractState;
+import net.corda.core.identity.AbstractParty;
+import net.corda.core.identity.Party;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@BelongsToContract(com.template.contracts.IOExtendedContract.class)
+public class IOExtendedState implements ContractState {
+
+    private final Party initParty;
+    private final List<Party> counterParties;
+    private String sK;
+
+    public byte[] getVal() {
+        return val;
+    }
+
+    public void setVal(final byte[] val) {
+        this.val = val;
+    }
+
+    private byte[] val;
+
+    public IOExtendedState(final Party initParty, final List<Party> counterParties, final String sK, final byte[] val) {
+        this.initParty = initParty;
+        this.counterParties = counterParties;
+        this.sK = sK;
+        this.val = val;
+    }
+
+    @NotNull
+    @Override
+    public List<AbstractParty> getParticipants() {
+        List<AbstractParty> participants = new ArrayList<>(counterParties);
+        participants.add(initParty);
+        return participants;
+    }
+
+    public String getsK() {
+        return sK;
+    }
+
+    public void setsK(final String sK) {
+        this.sK = sK;
+    }
+}

@@ -1,0 +1,104 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+
+- name: Register IP counter
+  shell: "if [ ! -f /tmp/peerccip.txt ]; then echo \"1\" > /tmp/peerccip.txt && cat /tmp/peerccip.txt; else echo $(($(cat /tmp/peerccip.txt)+1)) > /tmp/peerccip.txt && cat /tmp/peerccip.txt; fi"
+  register: peer_bridge_ip
+  when: BRIDGED_MODE
+  throttle: 1
+  tags:
+  - bm-set
+- name: Debug peer bridge IP
+  debug:
+    msg: "Bridge IP: {{ peer_bridge_ip.stdout }}"
+  when: BRIDGED_MODE   
+  tags:
+  - bm-set
+
+- include_tasks: inner-peer.yml
+  loop: "{{ certificates_config_peer }}"
+  loop_control:
+    loop_var: item
+    index_var: outer_index
+  tags:
+  - bm-set
+- name: Create peer-common.yaml
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/peer-common.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/peer_configs/peer-common.yaml"
+  tags:
+  - bm-set
+- name: Output if CouchDB is enabled
+  debug:
+    msg: "CouchDB is currently {{ ENABLE_COUCHDB }}"
+  tags:
+  - bm-set
+- name: Find files on remote machine (CouchDB)
+  find:
+    paths: "{{ MAIN_CONFIG_PATH }}/couchdb_configs"
+    patterns: "*.yaml"
+  register: output
+  when: ENABLE_COUCHDB
+  tags:
+  - bm-set
+
+- name: Stop CouchDB containers
+  docker_compose:
+    project_src: "{{ MAIN_CONFIG_PATH }}/couchdb_configs"
+    files: "{{ item.path | basename }}"
+    remove_volumes: yes
+    state: absent
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-rem
+  when: ENABLE_COUCHDB
+
+- name: Run CouchDB containers
+  docker_compose:
+    project_src: "{{ MAIN_CONFIG_PATH }}/couchdb_configs"
+    files: "{{ item.path | basename }}"
+    recreate: always
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-run
+  when: ENABLE_COUCHDB
+
+- name: Find files on remote machine (Peers)
+  find:
+    paths: "{{ MAIN_CONFIG_PATH }}/peer_configs"
+    patterns: "*.yaml"
+    excludes: "peer-common.yaml"
+  register: output
+  tags:
+  - bm-run
+
+- name: Stop peer containers
+  docker_compose:
+    project_src: "{{ MAIN_CONFIG_PATH }}/peer_configs"
+    files: "{{ item.path | basename }}"
+    remove_volumes: yes
+    state: absent
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-rem
+
+- name: Run peer containers
+  docker_compose:
+    project_src: "{{ MAIN_CONFIG_PATH }}/peer_configs"
+    files: "{{ item.path | basename }}"
+    recreate: always
+  loop: "{{ output.files|flatten(levels=1) }}"
+  throttle: 1
+  tags:
+  - bm-run
+  
+- name: Add IP addresses to container
+  shell: "echo \"echo {{ hostvars[item]['serverip'] }} {{item}} >> /etc/hosts\" | docker exec -i {{ inventory_hostname }} /bin/sh -"
+  when: BRIDGED_MODE and hostvars[item]['serverip'] is defined
+  loop: "{{ groups.all }}"
+  tags:
+  - bm-set

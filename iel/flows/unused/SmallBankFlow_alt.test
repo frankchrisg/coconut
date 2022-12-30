@@ -1,0 +1,611 @@
+package com.template.flows;
+
+import co.paralleluniverse.fibers.Suspendable;
+import com.template.contracts.SmallBankContract;
+import com.template.states.SmallBankState;
+import net.corda.core.contracts.Command;
+import net.corda.core.contracts.StateAndRef;
+import net.corda.core.flows.*;
+import net.corda.core.identity.Party;
+import net.corda.core.node.services.Vault;
+import net.corda.core.node.services.vault.PageSpecification;
+import net.corda.core.node.services.vault.QueryCriteria;
+import net.corda.core.node.services.vault.Sort;
+import net.corda.core.transactions.SignedTransaction;
+import net.corda.core.transactions.TransactionBuilder;
+import net.corda.core.utilities.ProgressTracker;
+
+import java.security.PublicKey;
+import java.util.*;
+
+@InitiatingFlow
+@StartableByRPC
+public class SmallBankFlow extends FlowLogic<Void> {
+
+    private final String[] args;
+    private final String function;
+    private Party notary;
+    private List<Party> counterParties;
+
+    private ProgressTracker.Step writeCheck;
+    private ProgressTracker.Step writeCheckError;
+    private ProgressTracker.Step depositChecking;
+    private ProgressTracker.Step depositCheckingError;
+    private ProgressTracker.Step transactSavings;
+    private ProgressTracker.Step transactSavingsError;
+    private ProgressTracker.Step transactSavingsBalanceError;
+    private ProgressTracker.Step sendPayment;
+    private ProgressTracker.Step sendPaymentError;
+    private ProgressTracker.Step sendPaymentBalanceError;
+    private ProgressTracker.Step balance;
+    private ProgressTracker.Step balanceError;
+    private ProgressTracker.Step amalgamate;
+    private ProgressTracker.Step amalgamateError;
+    private ProgressTracker.Step createAccount;
+    private ProgressTracker progressTracker;
+
+    QueryCriteria.VaultQueryCriteria vaultQueryCriteria = new QueryCriteria.VaultQueryCriteria();
+    PageSpecification pageSpecification = new PageSpecification();
+    Sort sort = new Sort(Collections.emptySet());
+
+    private static final String checkingSuffix = "_checking";
+
+    private static final String savingsSuffix = "_savings";
+
+    @Override
+    public ProgressTracker getProgressTracker() {
+        return this.progressTracker;
+    }
+
+    private String getSavings(String a) {
+        return a + savingsSuffix;
+    }
+
+    private String getChecking(String a) {
+        return a + checkingSuffix;
+    }
+
+    public SmallBankFlow(final String functionConstructor, final List<String> args, final Party notaryConstructor,
+                         final List<Party> counterPartiesConstructor,
+                         final QueryCriteria.VaultQueryCriteria queryCriteriaConstructor,
+                         final PageSpecification pageSpecificationConstructor, final Sort sortConstructor) {
+
+        if (queryCriteriaConstructor != null) {
+            vaultQueryCriteria = queryCriteriaConstructor;
+        }
+        if (pageSpecificationConstructor != null) {
+            pageSpecification = pageSpecificationConstructor;
+        }
+        if (sortConstructor != null) {
+            sort = sortConstructor;
+        }
+
+        if (notaryConstructor != null) {
+            notary = notaryConstructor;
+        }
+        if (counterPartiesConstructor != null) {
+            counterParties = counterPartiesConstructor;
+        }
+
+        function = functionConstructor;
+
+        this.args = args.toArray(new String[0]);
+
+        String signature = this.args[this.args.length - 1];
+
+        if ("WriteCheck".equals(function)) {
+            writeCheck = new ProgressTracker.Step("writeCheck " + signature);
+            writeCheckError = new ProgressTracker.Step("writeCheck/error " + signature);
+            progressTracker = new ProgressTracker(writeCheck, writeCheckError);
+        } else if ("DepositChecking".equals(function)) {
+            depositChecking = new ProgressTracker.Step("depositChecking " + signature);
+            depositCheckingError = new ProgressTracker.Step("depositChecking/error " + signature);
+            progressTracker = new ProgressTracker(depositChecking, depositCheckingError);
+        } else if ("TransactSavings".equals(function)) {
+            transactSavings = new ProgressTracker.Step("transactSavings " + signature);
+            transactSavingsError = new ProgressTracker.Step("transactSavings/error " + signature);
+            transactSavingsBalanceError = new ProgressTracker.Step("transactSavings/error/balance " + signature);
+            progressTracker = new ProgressTracker(transactSavings, transactSavingsError, transactSavingsBalanceError);
+        } else if ("SendPayment".equals(function)) {
+            sendPayment = new ProgressTracker.Step("sendPayment " + signature);
+            sendPaymentError = new ProgressTracker.Step("sendPayment/error " + signature);
+            sendPaymentBalanceError = new ProgressTracker.Step("sendPayment/error/checkingBalanceSender " + signature);
+            progressTracker = new ProgressTracker(sendPayment, sendPaymentError, sendPaymentBalanceError);
+        } else if ("Balance".equals(function)) {
+            balance = new ProgressTracker.Step("balance " + signature);
+            balanceError = new ProgressTracker.Step("balance/error " + signature);
+            progressTracker = new ProgressTracker(balance, balanceError);
+        } else if ("Amalgamate".equals(function)) {
+            amalgamate = new ProgressTracker.Step("amalgamate " + signature);
+            amalgamateError = new ProgressTracker.Step("amalgamate/error " + signature);
+            progressTracker = new ProgressTracker(amalgamate, amalgamateError);
+        } else if ("CreateAccount".equals(function)) {
+            createAccount = new ProgressTracker.Step("createAccount " + signature);
+            progressTracker = new ProgressTracker(createAccount);
+        }
+    }
+
+    @Suspendable
+    private void WriteCheck(String[] args) throws FlowException {
+
+        String acctId = args[0];
+
+        Vault.Page<SmallBankState> smallBankStatePage = getServiceHub().getVaultService().queryBy(SmallBankState.class,
+                vaultQueryCriteria, pageSpecification, sort);
+
+        List<StateAndRef<SmallBankState>> states = smallBankStatePage.getStates();
+
+        Integer stateSavings = null;
+        Integer stateChecking = null;
+        StateAndRef<SmallBankState> smallBankState = null;
+        for (final StateAndRef<SmallBankState> state : states) {
+            Integer stateSavingsTemp = state.getState().getData().getMap().get(getSavings(acctId));
+            Integer stateCheckingTemp = state.getState().getData().getMap().get(getChecking(acctId));
+            if (stateSavingsTemp != null && stateCheckingTemp != null) {
+                stateSavings = stateSavingsTemp;
+                stateChecking = stateCheckingTemp;
+                smallBankState = state;
+                break;
+            }
+        }
+
+        int amount = Integer.parseInt(args[1]);
+
+        if (smallBankState == null || amount < 0) {
+            progressTracker.setCurrentStep(writeCheckError);
+            return;
+        }
+        TransactionBuilder txBuilder = new TransactionBuilder(notary);
+        txBuilder.addInputState(smallBankState);
+
+        int total = stateSavings + stateChecking;
+
+        SmallBankState outputState;
+        if (total < amount) {
+            int check = stateChecking - amount - 1;
+            LinkedHashMap<String, Integer> stateMap = smallBankState.getState().getData().getMap();
+            stateMap.replace(getChecking(acctId), check);
+            outputState = new SmallBankState(getOurIdentity(), counterParties, stateMap);
+        } else {
+            int check = stateChecking - amount;
+            LinkedHashMap<String, Integer> stateMap = smallBankState.getState().getData().getMap();
+            stateMap.replace(getChecking(acctId), check);
+            outputState = new SmallBankState(getOurIdentity(), counterParties, stateMap);
+        }
+
+        txBuilder.addOutputState(outputState);
+        List<PublicKey> requiredSigners = new ArrayList<>();
+        counterParties.forEach(party -> requiredSigners.add(party.getOwningKey()));
+        Command<SmallBankContract.WriteCheck> command = new Command<>(new SmallBankContract.WriteCheck(),
+                requiredSigners);
+        txBuilder.addCommand(command);
+
+        SignedTransaction signedTx = getServiceHub().signInitialTransaction(txBuilder);
+        List<FlowSession> sessionList = new ArrayList<>();
+        counterParties.forEach(party -> sessionList.add(initiateFlow(party)));
+
+        SignedTransaction fullySignedTx;
+        try {
+            fullySignedTx = subFlow(new CollectSignaturesFlow(
+                    signedTx, sessionList, CollectSignaturesFlow.tracker()));
+            subFlow(new FinalityFlow(fullySignedTx, sessionList));
+        } catch (FlowException ex) {
+            getLogger().error("Error while handling flow " + ex.getMessage());
+            throw new FlowException("Error while handling flow " + this.getRunId() + " " + ex.getMessage());
+        }
+        progressTracker.setCurrentStep(writeCheck);
+    }
+
+    @Suspendable
+    private void DepositChecking(String[] args) throws FlowException {
+
+        String acctId = args[0];
+
+        Vault.Page<SmallBankState> smallBankStatePage = getServiceHub().getVaultService().queryBy(SmallBankState.class,
+                vaultQueryCriteria, pageSpecification, sort);
+
+        List<StateAndRef<SmallBankState>> states = smallBankStatePage.getStates();
+
+        Integer stateChecking = null;
+        StateAndRef<SmallBankState> smallBankState = null;
+        for (final StateAndRef<SmallBankState> state : states) {
+            Integer stateCheckingTemp = state.getState().getData().getMap().get(getChecking(acctId));
+            if (stateCheckingTemp != null) {
+                stateChecking = stateCheckingTemp;
+                smallBankState = state;
+                break;
+            }
+        }
+
+        if (smallBankState == null) {
+            progressTracker.setCurrentStep(depositCheckingError);
+            return;
+        }
+        TransactionBuilder txBuilder = new TransactionBuilder(notary);
+        txBuilder.addInputState(smallBankState);
+
+        int amount = Integer.parseInt(args[1]);
+
+        SmallBankState outputState;
+
+        stateChecking += amount;
+
+        LinkedHashMap<String, Integer> stateMap = smallBankState.getState().getData().getMap();
+        stateMap.replace(getChecking(acctId), stateChecking);
+        outputState = new SmallBankState(getOurIdentity(), counterParties, stateMap);
+
+        txBuilder.addOutputState(outputState);
+        List<PublicKey> requiredSigners = new ArrayList<>();
+        counterParties.forEach(party -> requiredSigners.add(party.getOwningKey()));
+        Command<SmallBankContract.DepositChecking> command = new Command<>(new SmallBankContract.DepositChecking(),
+                requiredSigners);
+        txBuilder.addCommand(command);
+
+        SignedTransaction signedTx = getServiceHub().signInitialTransaction(txBuilder);
+        List<FlowSession> sessionList = new ArrayList<>();
+        counterParties.forEach(party -> sessionList.add(initiateFlow(party)));
+
+        SignedTransaction fullySignedTx;
+        try {
+            fullySignedTx = subFlow(new CollectSignaturesFlow(
+                    signedTx, sessionList, CollectSignaturesFlow.tracker()));
+            subFlow(new FinalityFlow(fullySignedTx, sessionList));
+        } catch (FlowException ex) {
+            getLogger().error("Error while handling flow " + ex.getMessage());
+            throw new FlowException("Error while handling flow " + this.getRunId() + " " + ex.getMessage());
+        }
+        progressTracker.setCurrentStep(depositChecking);
+    }
+
+    @Suspendable
+    private void TransactSavings(String[] args) throws FlowException {
+
+        String acctId = args[0];
+
+        Vault.Page<SmallBankState> smallBankStatePage = getServiceHub().getVaultService().queryBy(SmallBankState.class,
+                vaultQueryCriteria, pageSpecification, sort);
+
+        List<StateAndRef<SmallBankState>> states = smallBankStatePage.getStates();
+
+        Integer stateSavings = null;
+        StateAndRef<SmallBankState> smallBankState = null;
+        for (final StateAndRef<SmallBankState> state : states) {
+            Integer stateSavingsTemp = state.getState().getData().getMap().get(getSavings(acctId));
+            if (stateSavingsTemp != null) {
+                stateSavings = stateSavingsTemp;
+                smallBankState = state;
+                break;
+            }
+        }
+
+        if (smallBankState == null) {
+            progressTracker.setCurrentStep(transactSavingsError);
+            return;
+        }
+        TransactionBuilder txBuilder = new TransactionBuilder(notary);
+        txBuilder.addInputState(smallBankState);
+
+        int amount = Integer.parseInt(args[1]);
+
+        int balance = stateSavings - amount;
+        if (balance < 0) {
+            progressTracker.setCurrentStep(transactSavingsBalanceError);
+            return;
+        }
+
+        stateSavings -= amount;
+
+        LinkedHashMap<String, Integer> stateMap = smallBankState.getState().getData().getMap();
+        stateMap.replace(getSavings(acctId), stateSavings);
+        SmallBankState outputState = new SmallBankState(getOurIdentity(), counterParties, stateMap);
+
+        txBuilder.addOutputState(outputState);
+        List<PublicKey> requiredSigners = new ArrayList<>();
+        counterParties.forEach(party -> requiredSigners.add(party.getOwningKey()));
+        Command<SmallBankContract.TransactSavings> command = new Command<>(new SmallBankContract.TransactSavings(),
+                requiredSigners);
+        txBuilder.addCommand(command);
+
+        SignedTransaction signedTx = getServiceHub().signInitialTransaction(txBuilder);
+        List<FlowSession> sessionList = new ArrayList<>();
+        counterParties.forEach(party -> sessionList.add(initiateFlow(party)));
+
+        SignedTransaction fullySignedTx;
+        try {
+            fullySignedTx = subFlow(new CollectSignaturesFlow(
+                    signedTx, sessionList, CollectSignaturesFlow.tracker()));
+            subFlow(new FinalityFlow(fullySignedTx, sessionList));
+        } catch (FlowException ex) {
+            getLogger().error("Error while handling flow " + ex.getMessage());
+            throw new FlowException("Error while handling flow " + this.getRunId() + " " + ex.getMessage());
+        }
+        progressTracker.setCurrentStep(transactSavings);
+    }
+
+    @Suspendable
+    private void SendPayment(String[] args) throws FlowException {
+
+        String sender = args[0];
+        String destination = args[1];
+        int amount = Integer.parseInt(args[2]);
+
+        Vault.Page<SmallBankState> smallBankStatePage = getServiceHub().getVaultService().queryBy(SmallBankState.class,
+                vaultQueryCriteria, pageSpecification, sort);
+
+        List<StateAndRef<SmallBankState>> states = smallBankStatePage.getStates();
+
+        Integer stateSavingsSender = null;
+        Integer stateCheckingSender = null;
+        Integer stateSavingsDestination = null;
+        Integer stateCheckingDestination = null;
+        StateAndRef<SmallBankState> smallBankStateSender = null;
+        StateAndRef<SmallBankState> smallBankStateDestination = null;
+        for (final StateAndRef<SmallBankState> state : states) {
+            Integer stateSavingsTempSender = state.getState().getData().getMap().get(getSavings(sender));
+            Integer stateCheckingTempSender = state.getState().getData().getMap().get(getChecking(sender));
+            Integer stateSavingsTempDestination = state.getState().getData().getMap().get(getSavings(destination));
+            Integer stateCheckingTempDestination = state.getState().getData().getMap().get(getChecking(destination));
+            if (stateSavingsTempSender != null && stateCheckingTempSender != null) {
+                stateSavingsSender = stateSavingsTempSender;
+                stateCheckingSender = stateCheckingTempSender;
+                smallBankStateSender = state;
+            }
+            if (stateSavingsTempDestination != null && stateCheckingTempDestination != null) {
+                stateSavingsDestination = stateSavingsTempDestination;
+                stateCheckingDestination = stateCheckingTempDestination;
+                smallBankStateDestination = state;
+            }
+            if (smallBankStateSender != null && smallBankStateDestination != null) {
+                break;
+            }
+        }
+
+        if (smallBankStateSender == null || smallBankStateDestination == null) {
+            progressTracker.setCurrentStep(sendPaymentError);
+            return;
+        }
+
+        if (stateCheckingSender < amount) {
+            progressTracker.setCurrentStep(sendPaymentBalanceError);
+            return;
+        }
+
+        stateCheckingSender -= amount;
+        stateCheckingDestination += amount;
+
+        TransactionBuilder txBuilder = new TransactionBuilder(notary);
+        txBuilder.addInputState(smallBankStateSender);
+        txBuilder.addInputState(smallBankStateDestination);
+
+        LinkedHashMap<String, Integer> stateMapSender = smallBankStateSender.getState().getData().getMap();
+        stateMapSender.replace(getChecking(sender), stateCheckingSender);
+        SmallBankState outputStateSender = new SmallBankState(getOurIdentity(), counterParties, stateMapSender);
+        LinkedHashMap<String, Integer> stateMapDestination = smallBankStateDestination.getState().getData().getMap();
+        stateMapDestination.replace(getChecking(destination), stateCheckingDestination);
+        SmallBankState outputStateDestination = new SmallBankState(getOurIdentity(), counterParties,
+                stateMapDestination);
+
+        txBuilder.addOutputState(outputStateSender);
+        txBuilder.addOutputState(outputStateDestination);
+        List<PublicKey> requiredSigners = new ArrayList<>();
+        counterParties.forEach(party -> requiredSigners.add(party.getOwningKey()));
+        Command<SmallBankContract.SendPayment> command = new Command<>(new SmallBankContract.SendPayment(),
+                requiredSigners);
+        txBuilder.addCommand(command);
+
+        SignedTransaction signedTx = getServiceHub().signInitialTransaction(txBuilder);
+        List<FlowSession> sessionList = new ArrayList<>();
+        counterParties.forEach(party -> sessionList.add(initiateFlow(party)));
+
+        SignedTransaction fullySignedTx;
+        try {
+            fullySignedTx = subFlow(new CollectSignaturesFlow(
+                    signedTx, sessionList, CollectSignaturesFlow.tracker()));
+            subFlow(new FinalityFlow(fullySignedTx, sessionList));
+        } catch (FlowException ex) {
+            getLogger().error("Error while handling flow " + ex.getMessage());
+            throw new FlowException("Error while handling flow " + this.getRunId() + " " + ex.getMessage());
+        }
+        progressTracker.setCurrentStep(sendPayment);
+    }
+
+    @Suspendable
+    private void Balance(String[] args) {
+
+        String acctId = args[0];
+
+        Vault.Page<SmallBankState> smallBankStatePage = getServiceHub().getVaultService().queryBy(SmallBankState.class,
+                vaultQueryCriteria, pageSpecification, sort);
+
+        List<StateAndRef<SmallBankState>> states = smallBankStatePage.getStates();
+
+        Integer stateSavings = null;
+        Integer stateChecking = null;
+        StateAndRef<SmallBankState> smallBankState = null;
+        for (final StateAndRef<SmallBankState> state : states) {
+            Integer stateSavingsTemp = state.getState().getData().getMap().get(getSavings(acctId));
+            Integer stateCheckingTemp = state.getState().getData().getMap().get(getChecking(acctId));
+            if (stateSavingsTemp != null && stateCheckingTemp != null) {
+                stateSavings = stateSavingsTemp;
+                stateChecking = stateCheckingTemp;
+                smallBankState = state;
+                break;
+            }
+        }
+
+        if (smallBankState == null) {
+            progressTracker.setCurrentStep(balanceError);
+            return;
+        }
+
+        int total = stateSavings + stateChecking;
+        //getLogger().error("Balance: " + total);
+        progressTracker.setCurrentStep(balance);
+    }
+
+    @Suspendable
+    private void Amalgamate(String[] args) throws FlowException {
+
+        String acctId0 = args[0];
+        String acctId1 = args[1];
+
+        Vault.Page<SmallBankState> smallBankStatePage = getServiceHub().getVaultService().queryBy(SmallBankState.class,
+                vaultQueryCriteria, pageSpecification, sort);
+
+        List<StateAndRef<SmallBankState>> states = smallBankStatePage.getStates();
+
+        Integer stateSavings0 = null;
+        Integer stateChecking0 = null;
+        Integer stateSavings1 = null;
+        Integer stateChecking1 = null;
+        StateAndRef<SmallBankState> smallBankState0 = null;
+        StateAndRef<SmallBankState> smallBankState1 = null;
+        for (final StateAndRef<SmallBankState> state : states) {
+
+            Integer stateSavingsTemp0 = state.getState().getData().getMap().get(getSavings(acctId0));
+            Integer stateCheckingTemp0 = state.getState().getData().getMap().get(getChecking(acctId0));
+            Integer stateSavingsTemp1 = state.getState().getData().getMap().get(getSavings(acctId1));
+            Integer stateCheckingTemp1 = state.getState().getData().getMap().get(getChecking(acctId1));
+            if (stateSavingsTemp0 != null && stateCheckingTemp0 != null) {
+                stateSavings0 = stateSavingsTemp0;
+                stateChecking0 = stateCheckingTemp0;
+                smallBankState0 = state;
+            }
+            if (stateSavingsTemp1 != null && stateCheckingTemp1 != null) {
+                stateSavings1 = stateSavingsTemp1;
+                stateChecking1 = stateCheckingTemp1;
+                smallBankState1 = state;
+            }
+
+            if (smallBankState0 != null && smallBankState1 != null) {
+                break;
+            }
+        }
+
+        if (smallBankState0 == null || smallBankState1 == null) {
+            progressTracker.setCurrentStep(amalgamateError);
+            return;
+        }
+
+        int total = stateSavings0 + stateChecking0;
+        //assert(total >= 0)
+
+        int zero = 0;
+
+        stateChecking1 += total;
+
+        TransactionBuilder txBuilder = new TransactionBuilder(notary);
+        txBuilder.addInputState(smallBankState0);
+        txBuilder.addInputState(smallBankState1);
+
+        LinkedHashMap<String, Integer> stateMap0 = smallBankState0.getState().getData().getMap();
+        stateMap0.replace(getChecking(acctId0), zero);
+        stateMap0.replace(getSavings(acctId0), zero);
+        SmallBankState outputState0 = new SmallBankState(getOurIdentity(), counterParties, stateMap0);
+
+        LinkedHashMap<String, Integer> stateMap1 = smallBankState1.getState().getData().getMap();
+        stateMap1.replace(getChecking(acctId1), stateChecking1);
+        SmallBankState outputState1 = new SmallBankState(getOurIdentity(), counterParties, stateMap1);
+
+        txBuilder.addOutputState(outputState0);
+        txBuilder.addOutputState(outputState1);
+
+        List<PublicKey> requiredSigners = new ArrayList<>();
+        counterParties.forEach(party -> requiredSigners.add(party.getOwningKey()));
+        Command<SmallBankContract.Amalgamate> command = new Command<>(new SmallBankContract.Amalgamate(),
+                requiredSigners);
+        txBuilder.addCommand(command);
+
+        SignedTransaction signedTx = getServiceHub().signInitialTransaction(txBuilder);
+        List<FlowSession> sessionList = new ArrayList<>();
+        counterParties.forEach(party -> sessionList.add(initiateFlow(party)));
+
+        SignedTransaction fullySignedTx;
+        try {
+            fullySignedTx = subFlow(new CollectSignaturesFlow(
+                    signedTx, sessionList, CollectSignaturesFlow.tracker()));
+            subFlow(new FinalityFlow(fullySignedTx, sessionList));
+        } catch (FlowException ex) {
+            getLogger().error("Error while handling flow " + ex.getMessage());
+            throw new FlowException("Error while handling flow " + this.getRunId() + " " + ex.getMessage());
+        }
+        progressTracker.setCurrentStep(amalgamate);
+    }
+
+
+    @Suspendable
+    private void CreateAccount(String[] args) throws FlowException {
+
+        String acctIdChecking = args[0];
+        String acctIdSavings = args[1];
+        int checking = Integer.parseInt(args[2]);
+        int savings = Integer.parseInt(args[3]);
+
+        TransactionBuilder txBuilder = new TransactionBuilder(notary);
+
+        LinkedHashMap<String, Integer> stateMapAccount = new LinkedHashMap<>();
+        stateMapAccount.put(getChecking(acctIdChecking), checking);
+        stateMapAccount.put(getSavings(acctIdSavings), savings);
+        SmallBankState outputState0 = new SmallBankState(getOurIdentity(), counterParties,
+                stateMapAccount);
+
+        txBuilder.addOutputState(outputState0);
+        List<PublicKey> requiredSigners = new ArrayList<>();
+        counterParties.forEach(party -> requiredSigners.add(party.getOwningKey()));
+        Command<SmallBankContract.CreateAccount> command = new Command<>(new SmallBankContract.CreateAccount(),
+                requiredSigners);
+        txBuilder.addCommand(command);
+
+        SignedTransaction signedTx = getServiceHub().signInitialTransaction(txBuilder);
+        List<FlowSession> sessionList = new ArrayList<>();
+        counterParties.forEach(party -> sessionList.add(initiateFlow(party)));
+
+        SignedTransaction fullySignedTx;
+        try {
+            fullySignedTx = subFlow(new CollectSignaturesFlow(
+                    signedTx, sessionList, CollectSignaturesFlow.tracker()));
+            subFlow(new FinalityFlow(fullySignedTx, sessionList));
+        } catch (FlowException ex) {
+            getLogger().error("Error while handling flow " + ex.getMessage());
+            throw new FlowException("Error while handling flow " + this.getRunId() + " " + ex.getMessage());
+        }
+        progressTracker.setCurrentStep(createAccount);
+    }
+
+    @Suspendable
+    @Override
+    public Void call() throws FlowException {
+
+        if ("WriteCheck".equals(function)) {
+            WriteCheck(args);
+            return null;
+        }
+        if ("DepositChecking".equals(function)) {
+            DepositChecking(args);
+            return null;
+        }
+        if ("TransactSavings".equals(function)) {
+            TransactSavings(args);
+            return null;
+        }
+        if ("SendPayment".equals(function)) {
+            SendPayment(args);
+            return null;
+        }
+        if ("Balance".equals(function)) {
+            Balance(args);
+            return null;
+        }
+        if ("Amalgamate".equals(function)) {
+            Amalgamate(args);
+            return null;
+        }
+        if ("CreateAccount".equals(function)) {
+            CreateAccount(args);
+            return null;
+        }
+
+        throw new FlowException("Not yet implemented function called");
+
+    }
+}

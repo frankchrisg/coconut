@@ -1,0 +1,273 @@
+{% if hostvars[item]['node_components'] is defined %}{% set nc= hostvars[item]['node_components'] %}{% else %}{% set nc = NODE_COMPONENTS %}{% endif %}
+---
+base:
+  data_dir: {{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}/{{ my_idx }}
+  role: {% if hostvars[item]['base_role'] is not defined %}{{ BASE_ROLE }}{% else %}hostvars[item]['base_role']{% endif %}
+
+  waypoint:
+    from_storage:
+      type: on_disk_storage
+      path: {{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}/{{ my_idx }}/secure-storage.json
+      namespace: ~
+
+{% if "CONSENSUS" in nc %}
+consensus:
+  contiguous_rounds: {{ CONTIGUOUS_ROUNDS }}
+  max_block_size: {{ MAX_BLOCK_SIZE }}
+  max_pruned_blocks_in_mem: {{ MAX_PRUNED_BLOCKS_IN_MEM }}
+  mempool_executed_txn_timeout_ms: {{ MEMPOOL_EXECUTED_TXN_TIMEOUT_MS }}
+  mempool_txn_pull_timeout_ms: {{ MEMPOOL_TXN_PULL_TIMEOUT_MS }}
+  round_initial_timeout_ms: {{ ROUND_INITIAL_TIMEOUT_MS }}
+  proposer_type:
+    type: leader_reputation
+    active_weights: 99
+    inactive_weights: 1
+  safety_rules:
+    backend:
+      type: on_disk_storage
+      path: {{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}/{{ my_idx }}/secure-storage.json
+      namespace: ~
+    logger:
+      chan_size: 10000
+      is_async: true
+      level: {{ CONSENSUS_LOG_LEVEL }}
+    service:
+      type: {{ CONSENSUS_SERVICE_TYPE }}
+    test: ~
+    verify_vote_proposal_signature: {{ VERIFY_VOTE_PROPOSAL_SIGNATURE }}
+    export_consensus_key: false
+    # 300000
+    network_timeout_ms: 300000
+    enable_cached_safety_data: true
+  sync_only: false
+  # https://github.com/diem/diem/blob/55b4494ebfab48c1facffb701738c1e00f93eb0d/consensus/src/txn_manager.rs -> NO_TXN_DELAY
+  # https://github.com/diem/diem/blob/ee87270d45713f3bbb4d6c9034fff6d45c4be0ca/testsuite/forge/src/backend/local/swarm.rs
+  mempool_poll_count: {{ MEMPOOL_POLL_COUNT }}
+  channel_size: 30
+  decoupled_execution: false
+  back_pressure_limit: {{ BACK_PRESSURE_LIMIT }}
+{% endif %}
+
+{% if "DEBUG_INTERFACE" in nc %}
+debug_interface:
+  admission_control_node_debug_port: {{ ADMISSION_CONTROL_NODE_DEBUG_START_PORT + my_idx }}
+  address: 0.0.0.0
+  #{% if BRIDGED_MODE %}{{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(item) + 3) }}{% else %}{{ hostvars[item]['serverip'] }}{% endif %}
+
+  metrics_server_port: {{ METRICS_SERVER_START_PORT + my_idx }}
+  public_metrics_server_port: {{ PUBLIC_METRICS_SERVER_START_PORT + my_idx }}
+{% endif %}
+
+{% if "EXECUTION" in nc %}
+execution:
+  sign_vote_proposal: {{ SIGN_VOTE_PROPOSAL }}
+  genesis_file_location: {{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}/{{ my_idx }}/genesis.blob
+  service:
+    type: {{ EXECUTION_SERVICE_TYPE }}
+  backend:
+    type: on_disk_storage
+    path: {{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}/{{ my_idx }}/secure-storage.json
+    namespace: ~
+  # 30000
+  network_timeout_ms: 300000
+{% endif %}
+
+{% if "FULL_NODE_NETWORKS" in nc %}
+full_node_networks:
+  - max_connection_delay_ms: 60000
+    connection_backoff_base: 2
+    connectivity_check_interval_ms: 5000
+    network_channel_size: 1024
+    max_concurrent_network_reqs: {{ MAX_CONCURRENT_NETWORK_REQS }}
+    discovery_method: onchain
+    discovery_methods: []
+    identity:
+      type: from_storage
+      backend:
+        type: on_disk_storage
+        path: {{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}/{{ my_idx }}/secure-storage.json
+        namespace: ~
+      key_name: fullnode_network
+      peer_id_name: owner_account
+    listen_address: /ip4/{% if BRIDGED_MODE %}{{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(item) + 3) }}{% else %}{{ hostvars[item]['serverip'] }}{% endif %}/tcp/{{ FULL_NODE_LISTEN_START_PORT + my_idx }}
+    #/ip4/{% if BRIDGED_MODE %}{{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(item) + 3) }}{% else %}{{ hostvars[item]['serverip'] }}{% endif %}/tcp/{{ FULL_NODE_LISTEN_START_PORT + my_idx }}
+    mutual_authentication: false
+    network_address_key_backend: ~
+    network_id: public
+    seed_addrs: {}
+    seeds: {}
+    max_frame_size: 8388608
+    enable_proxy_protocol: false
+    ping_interval_ms: 1000
+    ping_timeout_ms: 10000
+    ping_failures_tolerated: 5
+    # 0
+    max_outbound_connections: 1000
+    # 100
+    max_inbound_connections: 1000
+    inbound_rate_limit_config: ~
+    outbound_rate_limit_config: ~
+  - max_connection_delay_ms: 60000
+    connection_backoff_base: 2
+    connectivity_check_interval_ms: 5000
+    network_channel_size: 1024
+    max_concurrent_network_reqs: {{ MAX_CONCURRENT_NETWORK_REQS_PRIVATE }}
+    discovery_method: none
+    discovery_methods: []
+    identity:
+      type: from_storage
+      backend:
+        type: on_disk_storage
+        path: {{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}/{{ my_idx }}/secure-storage.json
+        namespace: ~
+      key_name: fullnode_network
+      peer_id_name: owner_account
+    listen_address: /ip4/{% if BRIDGED_MODE %}{{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(item) + 3) }}{% else %}{{ hostvars[item]['serverip'] }}{% endif %}/tcp/{{ FULL_NODE_LISTEN_START_PORT_PRIVATE + my_idx }}
+    #/ip4/{% if BRIDGED_MODE %}{{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(item) + 3) }}{% else %}{{ hostvars[item]['serverip'] }}{% endif %}/tcp/{{ FULL_NODE_LISTEN_START_PORT_PRIVATE + my_idx }}
+    mutual_authentication: false
+    network_address_key_backend: ~
+    network_id:
+      private: vfn
+    seed_addrs: {}
+    seeds: {}
+    max_frame_size: 8388608
+    enable_proxy_protocol: false
+    ping_interval_ms: 1000
+    ping_timeout_ms: 10000
+    ping_failures_tolerated: 5
+    # 0
+    max_outbound_connections: 1000
+    # 100
+    max_inbound_connections: 1000
+    inbound_rate_limit_config: ~
+    outbound_rate_limit_config: ~
+{% endif %}
+
+{% if "LOGGER" in nc %}
+logger:
+  chan_size: 10000
+  is_async: true
+  level: {{ LOG_LEVEL }}
+{% endif %}
+
+{% if "MEMPOOL" in nc %}
+mempool:
+  capacity: {{ MEMPOOL_CAPACITY }}
+  capacity_per_user: {{ CAPACITY_PER_USER }}
+  default_failovers: 3
+  max_broadcasts_per_peer: {{ MAX_BROADCASTS_PER_PEER }}
+  mempool_snapshot_interval_secs: 180
+  shared_mempool_ack_timeout_ms: 2000
+  shared_mempool_backoff_interval_ms: 30000
+  shared_mempool_batch_size: {{ SHARED_MEMPOOL_BATCH_SIZE }}
+  shared_mempool_max_concurrent_inbound_syncs: {{ SHARED_MEMPOOL_MAX_CONCURRENT_INBOUND_SYNCS }}
+  shared_mempool_tick_interval_ms: {{ SHARED_MEMPOOL_TICK_INTERVAL_MS }}
+  system_transaction_timeout_secs: 600
+  system_transaction_gc_interval_ms: 60000
+{% endif %}
+
+{% if "METRICS" in nc %}
+metrics: {}
+{% endif %}
+
+{% if "JSON_RPC" in nc %}
+json_rpc:
+  address: 0.0.0.0:{{ JSON_RPC_START_PORT + my_idx }}
+  #"{% if BRIDGED_MODE %}{{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(item) + 3) }}{% else %}{{ hostvars[item]['serverip'] }}{% endif %}:{{ JSON_RPC_START_PORT + my_idx }}"
+  batch_size_limit: {{ BATCH_SIZE_LIMIT }}
+  page_size_limit: {{ PAGE_SIZE_LIMIT }}
+  content_length_limit: 131072
+  tls_cert_path: ~
+  tls_key_path: ~
+  stream_rpc:
+    enabled: true
+    # 100
+    subscription_fetch_size: 1000
+    # 100
+    send_queue_size: 1000
+    # 100
+    poll_interval_ms: 1000
+    max_poll_interval_ms: 5000
+{% endif %}
+
+{% if "API" in nc %}
+api:
+  enabled: true
+  address: 0.0.0.0:{{ API_START_PORT + my_idx }}
+  #"{% if BRIDGED_MODE %}{{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(item) + 3) }}{% else %}{{ hostvars[item]['serverip'] }}{% endif %}:{{ API_START_PORT + my_idx }}"
+{% endif %}
+
+{% if "STATE_SYNC" in nc %}
+state_sync:
+  chunk_limit: {{ CHUNK_LIMIT }}
+  client_commit_timeout_ms: 5000
+  long_poll_timeout_ms: 10000
+  max_chunk_limit: {{ MAX_CHUNK_LIMIT }}
+  max_timeout_ms: 120000
+  mempool_commit_timeout_ms: 5000
+  multicast_timeout_ms: 30000
+  sync_request_timeout_ms: 60000
+  tick_interval_ms: {{ TICK_INTERVAL }}
+{% endif %}
+
+{% if "STORAGE" in nc %}
+storage:
+  address: 0.0.0.0:{{ STORAGE_START_PORT + my_idx }}
+  #"{% if BRIDGED_MODE %}{{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(item) + 3) }}{% else %}{{ hostvars[item]['serverip'] }}{% endif %}:{{ STORAGE_START_PORT + my_idx }}"
+  backup_service_address: 0.0.0.0:{{ STORAGE_BACKUP_START_PORT + my_idx }}
+  #"{% if BRIDGED_MODE %}{{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(item) + 3) }}{% else %}{{ hostvars[item]['serverip'] }}{% endif %}:{{ STORAGE_BACKUP_START_PORT + my_idx }}"
+  dir: db
+  grpc_max_receive_len: 100000000
+  prune_window: 1000000
+  # 30000
+  timeout_ms: 300000
+  rocksdb_config:
+    max_open_files: {{ MAX_OPEN_FILES_STORAGE }}
+    max_total_wal_size: 1073741824
+  account_count_migration: false
+{% endif %}
+
+{% if "TEST" in nc %}
+test: ~
+{% endif %}
+
+{% if "VALIDATOR_NETWORK" in nc %}
+validator_network:
+  max_connection_delay_ms: 60000
+  connection_backoff_base: 2
+  connectivity_check_interval_ms: 5000
+  network_channel_size: 1024
+  max_concurrent_network_reqs: {{ MAX_CONCURRENT_NETWORK_REQS_VALIDATOR }}
+  discovery_method: onchain
+  discovery_methods: []
+  identity:
+    type: from_storage
+    backend:
+      type: on_disk_storage
+      path: {{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}/{{ my_idx }}/secure-storage.json
+      namespace: ~
+    key_name: validator_network
+    peer_id_name: owner_account
+  listen_address: /ip4/{% if BRIDGED_MODE %}{{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(item) + 3) }}{% else %}{{ hostvars[item]['serverip'] }}{% endif %}/tcp/{{ VALIDATOR_START_PORT + my_idx }}
+  #/ip4/{% if BRIDGED_MODE %}{{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(item) + 3) }}{% else %}{{ hostvars[item]['serverip'] }}{% endif %}/tcp/{{ VALIDATOR_START_PORT + my_idx }}
+  mutual_authentication: true
+  network_address_key_backend:
+    type: on_disk_storage
+    path: {{ DIEM_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}/{{ my_idx }}/secure-storage.json
+    namespace: ~
+  network_id: validator
+  seed_addrs: {}
+  seeds: {}
+  max_frame_size: 8388608
+  enable_proxy_protocol: false
+  ping_interval_ms: 1000
+  ping_timeout_ms: 10000
+  ping_failures_tolerated: 5
+  max_outbound_connections: {{ MAX_OUTBOUND_CONNECTIONS_VALIDATOR }}
+  # 100
+  max_inbound_connections: 1000
+  inbound_rate_limit_config: ~
+  outbound_rate_limit_config: ~
+{% endif %}
+
+failpoints: ~

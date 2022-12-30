@@ -1,0 +1,109 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Get stats for MAIN_CONFIG_PATH
+  stat: path="{{ MAIN_CONFIG_PATH }}"
+  register: mainpath
+  tags:
+  - bm-set
+- name: Compress main directory
+  shell: "$(which tar) cvzf {{ CONFIG_PATH }}.tgz --exclude=.git {{ CONFIG_PATH }}/*_configs"
+  args:
+    chdir: "{{ MAIN_PATH }}"
+  delegate_to: localhost
+  run_once: true
+  tags:
+  - bm-set
+#  archive:
+#    path: "{{ MAIN_CONFIG_PATH }}"
+#    dest: "{{ MAIN_CONFIG_PATH }}.tgz"
+#    exclude_path:
+#      - "{{ MAIN_CONFIG_PATH }}/.git"
+#  when: not mainpath.stat.isdir is defined
+- name: Ensure MAIN_CONFIG_PATH directory exists
+  file:
+    path: "{{ MAIN_CONFIG_PATH }}/../"
+    state: directory
+  tags:
+  - bm-set
+- name: Copy the main path
+  unarchive:
+    src: "{{ MAIN_CONFIG_PATH }}.tgz"
+    dest: "{{ MAIN_CONFIG_PATH }}/../"
+#  when: not mainpath.stat.isdir is defined
+  tags:
+  - bm-set
+- name: Get stats for LOCAL_CHAINCODE_PATH
+  stat: path="{{ LOCAL_CHAINCODE_PATH }}"
+  register: localsample
+  tags:
+  - bm-set
+- name: Compress chaincode directory
+  archive:
+    path: "{{ LOCAL_CHAINCODE_PATH }}"
+    dest: "{{ LOCAL_CHAINCODE_PATH }}.tgz"
+    exclude_path:
+      - "{{ LOCAL_CHAINCODE_PATH }}/.git"
+  delegate_to: localhost
+  run_once: true
+#  when: not localsample.stat.isdir is defined
+  tags:
+  - bm-set
+- name: Ensure LOCAL_CHAINCODE_PATH directory exists
+  file:
+    path: "{{ LOCAL_CHAINCODE_PATH }}/../"
+    state: directory
+  tags:
+  - bm-set
+- name: Copy the chaincode path
+  unarchive:
+    src: "{{ LOCAL_CHAINCODE_PATH }}.tgz"
+    dest: "{{ LOCAL_CHAINCODE_PATH }}/../"
+#  when: not localsample.stat.isdir is defined
+  tags:
+  - bm-set
+- name: Get stats for LOCAL_CRYPTO_PATH
+  stat: path="{{ LOCAL_CRYPTO_PATH }}"
+  register: localbinary
+  tags:
+  - bm-set
+- name: Compress crypto directory
+  archive:
+    path: "{{ LOCAL_CRYPTO_PATH }}"
+    dest: "{{ LOCAL_CRYPTO_PATH }}.tgz"
+    exclude_path:
+      - "{{ LOCAL_CRYPTO_PATH }}/.git"
+  delegate_to: localhost
+  run_once: true
+#  when: not localbinary.stat.isdir is defined
+  tags:
+  - bm-set
+- name: Ensure LOCAL_CRYPTO_PATH directory exists
+  file:
+    path: "{{ LOCAL_CRYPTO_PATH }}/../"
+    state: directory
+  tags:
+  - bm-set
+- name: Copy the crypto path
+  unarchive:
+    src: "{{ LOCAL_CRYPTO_PATH }}.tgz"
+    dest: "{{ LOCAL_CRYPTO_PATH }}/../"
+#  when: not localbinary.stat.isdir is defined
+  tags:
+  - bm-set
+#- name: Copy the hosts file
+#  copy:
+#    src: "{{ MAIN_CONFIG_PATH }}/hosts"
+#    dest: "/etc/hosts"
+#  become: true
+- name: Add IP addresses
+  lineinfile:
+    dest: /etc/hosts
+    regexp: '.*{{ item }}$'
+    line: "{{ hostvars[item]['serverip'] }} {{item}}"
+    state: present
+  when: hostvars[item]['serverip'] is defined
+  loop: "{{ groups.all }}"
+  become: true
+  tags:
+  - bm-set

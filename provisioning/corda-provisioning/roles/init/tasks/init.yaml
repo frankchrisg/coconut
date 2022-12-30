@@ -1,0 +1,76 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Register lsb release
+  command: lsb_release -cs
+  register: lsb_release
+- name: Install necessary packages
+  apt:
+    name:
+      - aptitude
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg2
+      - software-properties-common
+- name: Add docker repository key
+  apt_key:
+    id: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
+    url: "https://download.docker.com/linux/ubuntu/gpg"
+  become: true
+- name: Add Ubuntu key
+  apt_key:
+    id: 8AA7AF1F1091A5FD
+    keyserver: "hkp://keyserver.ubuntu.com:80"
+  become: true
+- name: Clear DNS cache
+  shell: "systemd-resolve --flush-caches"
+  become: true
+- name: Add docker repository
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ lsb_release.stdout }} stable
+    # If the Docker repository is not available, use the following line
+    # repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable
+    state: present
+  become: true
+- name: Upgrade and update
+  apt:
+    update_cache: yes
+    upgrade: safe
+  become: true
+  tags: packages
+- name: Install necessary packages
+  apt:
+    name:
+      - docker-ce
+      - docker-compose
+      - python-docker
+      - python3-docker
+  become: true
+  ignore_errors: true
+- name: Get current user
+  command: whoami
+  register: current_user
+- name: Add user to docker group
+  user: 'append=yes groups=docker name="{{ current_user.stdout }}"'
+  become: true
+- name: Open Docker daemon for TCP-connections
+  lineinfile:
+    path: /lib/systemd/system/docker.service
+    regexp: '^ExecStart=\/usr\/bin\/dockerd.*$'
+    line: "ExecStart=/usr/bin/dockerd --containerd=/run/containerd/containerd.sock -H unix:// -H tcp://0.0.0.0:2375"
+  become: true
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+    daemon_reexec: yes
+  become: true
+- name: Restart docker
+  systemd:
+    state: restarted
+    daemon_reload: yes
+    name: docker
+  when: hostvars[inventory_hostname]['executor_main'] is not defined
+- name: Init done
+  debug:
+    msg: "Init done"

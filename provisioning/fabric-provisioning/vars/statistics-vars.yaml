@@ -1,0 +1,36 @@
+CENTRAL_LOG_PATH: "{{ BASE_PATH }}/Schreibtisch/logs/"
+# The log path on the local machine which should collect all logs
+LOCAL_LOG_PATH: "{{ BASE_PATH }}/Schreibtisch/logs_collected/"
+
+BENCHMARKING_CLIENT_JAR: "chatApplication-0.0.1-SNAPSHOT-jar-with-dependencies.jar"
+BENCHMARKING_CLIENT_JAR_PATH: "{{ BASE_PATH }}/Schreibtisch/hyperledger-provisioning"
+BENCHMARKING_CLIENT_PACKAGE: "edu.hm.dako.chat.benchmarking"
+BENCHMARKING_CA_PATH: "{{ BASE_PATH }}/Schreibtisch/hyperledger-provisioning/ca.pem"
+
+# Most useful class to run the tests with will be:
+# BenchmarkingUserInterfaceSimulation
+BENCHMARKING_CLIENT_CLASS: "BenchmarkingUserInterfaceSimulation"
+BENCHMARKING_CLIENT_FULL_ID: " {{ BENCHMARKING_CLIENT_PACKAGE }}.{{ BENCHMARKING_CLIENT_CLASS }}"
+
+BENCHMARKING_MAX_CLIENT_THREADS: "10"
+BENCHMARKING_CLIENT_RERUNS: "3"
+
+# How long should be waited before another Benchmarking Client will be started
+# 10 | random(start=1, step=1) means any random number between 1 and 10
+SLEEP_TIME: "{{ 1 | random(start=1, step=1) }}"
+#SLEEP_TIME_COMMAND: "$((RANDOM % {{ SLEEP_TIME }}))"
+SLEEP_TIME_COMMAND: "{{ SLEEP_TIME }}"
+
+# Whether to build a quite simple Docker image which is responsible for running the Java client application 
+BUILD_JVM_IMAGE: false
+REBUILD_JVM_IMAGE_IF_EXISTS: "no"
+# Whether to run the client application in the container. Might be useful to limit the allocated resources like CPU or memory
+RUN_IN_JVM_CONTAINER: false
+# Limiting resources and starting a separate Docker container may be a workaround when the client application is not terminating.
+# This behaviour was observed when running the client application which creates high load depending of the set values on the same servers where Hyperledger Fabric was executed on.
+# A high load of the servers may lead to message loss and therefore a violation of the liveness criteria from the perspective of the client application.
+# If you do not want to start separate Docker containers, you could also adjust the manifold configuration (number of threads, skipping events etc.) options and see what happens.
+# Only use the cores 2 and 4
+MAX_CPU_CORES: "0,1,2"
+# Set a memory limit, 0 = do not set any memory limits
+MAX_MEMORY: 0

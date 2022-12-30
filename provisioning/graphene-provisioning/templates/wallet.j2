@@ -1,0 +1,13 @@
+{
+  "chain_id": {{ chain_id.stdout }},
+  "my_accounts": [],
+  "cipher_keys": "",
+  "extra_keys": [],
+  "pending_account_registrations": [],
+  "pending_witness_registrations": [],
+  "labeled_keys": [],
+  "blind_receipts": [],
+  "ws_server": "{% if hostvars[inventory_hostname][''differentattachnode''] is not defined %}ws://{{ hostvars[inventory_hostname][''serverip''] }}:{{ RPC_START_PORT + groups[''node''].index(inventory_hostname) }}{% else %}ws://{{ hostvars[inventory_hostname][''differentattachnode''] }}{% endif %}",
+  "ws_user": "{{ WS_USER }}",
+  "ws_password": "{{ WS_PASSWORD }}"
+}

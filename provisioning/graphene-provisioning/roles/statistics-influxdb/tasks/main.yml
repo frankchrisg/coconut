@@ -1,0 +1,125 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Get container status
+  shell: docker inspect --format={{ '{{.State.Running}}' }} influxdb
+  register: status
+  failed_when: status.rc != 1 and status.rc != 0
+- name: Pull Influx image
+  docker_image:
+    name: "influxdb"
+    tag: "{{ INFLUXDB_VERSION }}"
+  when: status.stdout != "true"
+- name: Create Influxdb directory to mount if it does not exist
+  file:
+    path: /var/lib/influx-data
+    state: directory
+    mode: '0755'
+  become: true
+- name: Start Influxdb on {{ inventory_hostname }}
+  docker_container:
+    name: influxdb
+    image: "influxdb:{{ INFLUXDB_VERSION }}"
+    restart_policy: always
+    network_mode: host
+    #ports:
+    #  - "8086:8086"
+    env:
+        INFLUXDB_DB: "metrics_graphene"
+        INFLUXDB_HTTP_AUTH_ENABLED: "true"
+        INFLUXDB_ADMIN_USER: "{{ INFLUXDB_ADMIN_USER }}"
+        INFLUXDB_ADMIN_PASSWORD: "{{ INFLUXDB_ADMIN_PASSWORD }}"
+        INFLUXDB_USER: "{{ INFLUXDB_USER }}"
+        INFLUXDB_USER_PASSWORD: "{{ INFLUXDB_USER_PASSWORD }}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/influx-data:/var/lib/influxdb
+      - /etc/timezone:/etc/timezone
+      - /etc/security/limits.conf:/etc/security/limits.conf
+      - /etc/sysctl.conf:/etc/sysctl.conf
+  when: status.stdout != "true"
+- name: Wait for container
+  wait_for:
+    port: "8086"
+    host: "{{inventory_hostname}}"
+- name: Delete grafana files
+  file:
+    state: absent
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/grafana/"
+- name: Create grafana directory
+  file:
+    state: directory
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/grafana/"
+- name: Copy grafana files
+  copy:
+    src: "{{ MAIN_CONFIG_PATH }}/grafana"
+    dest: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/"
+
+- name: Replace url
+  replace:
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/grafana/datasources/influxdb.json"
+    regexp: '  "url":"http://influxdb:8086",'
+    replace: '  "url":"http://{{ inventory_hostname }}:8086",'
+- name: Replace username
+  replace:
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/grafana/datasources/influxdb.json"
+    regexp: '  "user":"username",'
+    replace: '  "user":"{{ INFLUXDB_USER }}",'
+- name: Replace password
+  replace:
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/grafana/datasources/influxdb.json"
+    regexp: '  "password":"password",'
+    replace: '  "password":"{{ INFLUXDB_USER_PASSWORD }}",'
+- name: Replace name
+  replace:
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/grafana/datasources/influxdb.json"
+    regexp: '  "name":"metrics",'
+    replace: '  "name":"metrics_graphene",'
+- name: Replace database
+  replace:
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/grafana/datasources/influxdb.json"
+    regexp: '  "database":"metrics",'
+    replace: '  "database":"metrics_graphene",'
+
+- name: Set permissions to entrypoint file
+  file:
+    path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/grafana/grafana_entrypoint.sh"
+    mode: '0755'
+- name: Build an Ubuntu image for stats-grafana
+  docker_image:
+    build:
+      network: host
+      path: "{{ GRAPHENE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/"
+      dockerfile: "grafana/{{ DOCKERFILE_GRAFANA }}"
+      nocache: "yes"
+      pull: "yes"
+    name: "{{ DOCKERFILE_GRAFANA }}"
+    force: "{{ REBUILD_GRAFANA_DOCKERFILE }}"
+    source: "build"
+- name: Start Grafana on {{ inventory_hostname }}
+  docker_container:
+    name: "{{ DOCKERFILE_GRAFANA }}"
+    image: "{{ DOCKERFILE_GRAFANA }}"
+    restart_policy: always
+    network_mode: host
+    #ports:
+    #  - "3000:3000"
+    volumes:
+      - /etc/timezone:/etc/timezone
+      - /etc/security/limits.conf:/etc/security/limits.conf
+      - /etc/sysctl.conf:/etc/sysctl.conf
+      
+- name: Create database
+  uri:
+    url: "http://{{ groups['statistics'].0 }}:8086/query?q={{ 'CREATE DATABASE metrics_graphene'|urlencode }}"
+    method: GET
+    url_username: "{{ INFLUXDB_ADMIN_USER }}"
+    url_password: "{{ INFLUXDB_ADMIN_PASSWORD }}"
+  tags: curl-influxdb
+- name: Grant privileges to database
+  uri:
+    url: "http://{{ groups['statistics'].0 }}:8086/query?q={{ 'GRANT ALL ON metrics_graphene TO '|urlencode }}{{ INFLUXDB_USER|urlencode }}"
+    method: GET
+    url_username: "{{ INFLUXDB_ADMIN_USER }}"
+    url_password: "{{ INFLUXDB_ADMIN_PASSWORD }}"
+  tags: curl-influxdb
