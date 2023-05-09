@@ -1,0 +1,46 @@
+- name: Delete smart contract directory
+  file:
+    path: "{{ CONTRACT_PATH }}"
+    state: absent
+  become: true
+  tags:
+  - bm-set
+- name: Copy contract directory
+  copy:
+    src: "{{ CONTRACT_PATH }}/"
+    dest: "{{ CONTRACT_PATH }}/"
+  when: hostvars[inventory_hostname]['genesis'] is defined and hostvars[inventory_hostname]['genesis'] | bool
+  tags:
+  - bm-set
+- name: Copy contract directory to container
+  shell: "docker cp {{ CONTRACT_PATH }}/ {{ inventory_hostname }}:/"
+  when: hostvars[inventory_hostname]['genesis'] is defined and hostvars[inventory_hostname]['genesis'] | bool
+  tags:
+  - bm-set
+- name: Create key for contract deployment
+  shell: "echo '{{ LOCAL_SOLANA_PATH }}/{{ BUILD_PATH }}/solana-keygen new -o /root/.config/solana/id.json --force --no-bip39-passphrase' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: hostvars[inventory_hostname]['genesis'] is defined and hostvars[inventory_hostname]['genesis'] | bool
+  tags:
+  - bm-run
+- name:
+  shell: "echo '{{ LOCAL_SOLANA_PATH }}/{{ BUILD_PATH }}/solana config set --url {{ CONTRACT_URL }} --keypair {{ CONTRACT_KEY }}' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: hostvars[inventory_hostname]['genesis'] is defined and hostvars[inventory_hostname]['genesis'] | bool
+  tags:
+  - bm-run
+- name: Airdrop predefined amount
+  shell: "echo '{{ LOCAL_SOLANA_PATH }}/{{ BUILD_PATH }}/solana airdrop {{ AIRDROP_AMOUNT }}' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: hostvars[inventory_hostname]['genesis'] is defined and hostvars[inventory_hostname]['genesis'] | bool
+  tags:
+  - bm-run
+- name: Deploy contracts from contract directory
+  shell: "echo 'for i in /contracts/*; do echo $i && {{ LOCAL_SOLANA_PATH }}/{{ BUILD_PATH }}/solana program deploy $i; done' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  register: output
+  when: hostvars[inventory_hostname]['genesis'] is defined and hostvars[inventory_hostname]['genesis'] | bool
+  tags:
+  - bm-run
+- name: Debug genesis output
+  debug: 
+    msg: "{{ output }}"
+  when: hostvars[inventory_hostname]['genesis'] is defined and hostvars[inventory_hostname]['genesis'] | bool
+  tags:
+  - bm-set

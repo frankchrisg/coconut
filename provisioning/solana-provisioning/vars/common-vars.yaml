@@ -1,0 +1,156 @@
+CONFIG_PATH: "templates"
+MAIN_PATH: "{{ playbook_dir }}"
+MAIN_CONFIG_PATH: "{{MAIN_PATH}}/{{CONFIG_PATH}}"
+
+#BASE_PATH: "/home/parallels/FINAL_graphene_corda_latest_xxx"
+BASE_PATH: "/home/parallels/Schreibtisch"
+
+DOCKERFILE_PATH: "{{MAIN_CONFIG_PATH}}/ubuntu-solana"
+DOCKERFILE_NAME: "ubuntu-solana"
+
+LOCAL_SOLANA_PATH: "{{ BASE_PATH }}/solana"
+SOLANA_VERSION: "05f2a01a80b5822a86d16110cc717a17c15313dc" #"755a9a6600c5ea0c7e6faf3cc731e65c005f15bb" #"8877ac2aa90ead46fe6d84a6590ff5baf5e2391c"
+
+KEY_PATH: "/home/parallels/keys_solana"
+CONTRACT_PATH: "{{ MAIN_CONFIG_PATH }}/contracts"
+
+LEDGER_PATH_BASE: "/home/parallels"
+LEDGER_PATH: "{{ LEDGER_PATH_BASE }}/solanaledgergenesis"
+# <NUM_HASHES|"auto"|"sleep">
+# Default: auto
+HASHES_PER_TICK: "1000"
+# Default: 20000
+TARGET_SIGNATURES_PER_SLOT: 0
+# Default: 10000
+TARGET_LAMPORTS_PER_SIGNATURE: 1
+# Default: 100
+VOTE_COMMISSION_PERCENTAGE: 100
+TARGET_TICK_DURATION: 50
+FAUCET_LAMPORTS: 500000000000000000
+# Default: mainnet-beta
+# development, devnet, testnet, mainnet-beta
+CLUSTER_TYPE: "devnet"
+BOOTSTRAP_VALIDATOR_KEYS: "/home/parallels/keys_solana/validator-0-validator-keypair.json /home/parallels/keys_solana/validator-0-vote-keypair.json /home/parallels/validator-stake-keypair.json"
+# Use command below for auto
+#GENESIS_COMMAND_LINE: "--enable-warmup-epochs --vote-commission-percentage {{ VOTE_COMMISSION_PERCENTAGE }} --target-lamports-per-signature {{ TARGET_LAMPORTS_PER_SIGNATURE }} --target-signatures-per-slot {{ TARGET_SIGNATURES_PER_SLOT }} --ledger {{ LEDGER_PATH }} --hashes-per-tick {{ HASHES_PER_TICK }} --target-tick-duration {{ TARGET_TICK_DURATION }} --cluster-type {{ CLUSTER_TYPE }} --faucet-lamports {{ FAUCET_LAMPORTS }} --bootstrap-validator {{ BOOTSTRAP_VALIDATOR_KEYS }}"
+# Use command below for NUM_HASHES and sleep
+GENESIS_COMMAND_LINE: "--enable-warmup-epochs --vote-commission-percentage {{ VOTE_COMMISSION_PERCENTAGE }} --target-lamports-per-signature {{ TARGET_LAMPORTS_PER_SIGNATURE }} --target-signatures-per-slot {{ TARGET_SIGNATURES_PER_SLOT }} --ledger {{ LEDGER_PATH }} --hashes-per-tick {{ HASHES_PER_TICK }} --cluster-type {{ CLUSTER_TYPE }} --faucet-lamports {{ FAUCET_LAMPORTS }} --bootstrap-validator {{ BOOTSTRAP_VALIDATOR_KEYS }}"
+
+VALIDATOR_LOGGING_LEVEL: debug #trace
+
+#pub const MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES: usize = 64 * 1024 * 1024;
+#pub const DEFAULT_INSTRUCTION_COMPUTE_UNIT_LIMIT: u32 = 200_000;
+#pub const MAX_COMPUTE_UNIT_LIMIT: u32 = 1_400_000;
+#const MAX_HEAP_FRAME_BYTES: u32 = 256 * 1024;
+
+# Default: 200_000
+COMPUTE_LIMIT: "1600_000"
+# Default: 1_400_000
+COMPUTE_MEMORY_LIMIT: "2_400_000"
+
+SOLANA_URL: "https://github.com/solana-labs/solana.git"
+SOLANA_FORCE_CLONE: no
+MAKE_RETRIES: 5
+MAKE_PROCESS: false
+
+ENABLE_EXTENDED_TX_METADATA_STORAGE: true
+ENABLE_RPC_TRANSACTION_HISTORY: true
+ENABLE_CUDA: false
+ENABLE_FULL_RPC_API: true
+HALT_ON_KNOWN_VALIDATORS_ACCOUNTS_HASH_MISMATCH: false
+ENABLE_BLOCK_SUBSCRIPTION: true
+ENABLE_VOTE_SUBSCRIPTION: true
+ENABLE_UDP: false
+# Default: 8000-10000
+ENTRY_START_PORT: 40000
+RPC_START_PORT: 20000
+# Default: 100
+RPC_MAX_MULTIPLE_ACCOUNTS: 100
+# Default: 51200
+RPC_MAX_REQUEST_BODY_SIZE: 51200
+# Default: 1000000
+RPC_PUBSUB_MAX_ACTIVE_SUBSCRIPTIONS: 1000000
+# 0 will disable RPC PubSub notifications
+RPC_PUBSUB_NOTIFICATION_THREADS: 4
+# Default: 268435456
+RPC_PUBSUB_QUEUE_CAPACITY_BYTES: 268435456
+# Default: 10000000
+RPC_PUBSUB_QUEUE_CAPACITY_ITEMS: 10000000
+# Default: 4
+RPC_PUBSUB_WORKER_THREADS: 4
+# Default: 2000
+RPC_SEND_RETRY_MS: 2000
+# Default: 6
+RPC_THREADS: 6
+NO_OS_NETWORK_LIMITS_TEST: true
+NO_POH_SPEED_TEST: true
+# Default: 4
+TPU_CONNECTION_POOL_SIZE: 4
+NO_SNAPSHOT_FETCH: false
+# Default: 25000
+FULL_SNAPSHOT_INTERVAL_SLOTS: 100 #10
+# Number of slots between generating snapshots, 0 to disable snapshots
+# Default: 100
+INCREMENTAL_SNAPSHOT_INTERVAL_SLOT: 10 #5
+NO_INCREMENTAL_SNAPSHOTS: false
+# Default: 100
+ACCOUNT_HASH_INTERVAL_SLOTS: 10 #5
+
+RETRIES_SNAPSHOT_CATCH_UP: 100
+DELAY_SNAPTSHOT_CATCH_UP: 10
+
+# Default: 1
+NUM_GEN_TX_THREADS: 1
+TPU_USE_QUIC: false
+# Default: 16384
+SEND_BATCH_SIZE: 16384
+
+SWARM_PREFIX: "172.16.22."
+GENESIS_NODE_ADDRESS: "{{ groups['node'].0 }}:20001"
+SNAPSHOT_CONDITION: "{{ FULL_SNAPSHOT_INTERVAL_SLOTS * 1 | int }}"
+CONTRACT_URL: "http://192.168.178.124:20001"
+CONTRACT_KEY: "/home/parallels/keys_solana/validator-0-validator-keypair.json"
+AIRDROP_AMOUNT: 100
+
+BUILD_PATH: "/target/debug"
+
+BUILD_ARGUMENTS: ""
+#"--all"
+
+NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH: "{{ BASE_PATH }}/solana-related/solana-nodes"
+
+# Should be used in Docker bridged mode See the templates for network communication in this mode
+NET_NAME: "uncomment_in_file_for_bridged_mode"
+BRIDGED_MODE: false
+
+ENABLE_METRICS: true
+INFLUX_HOST: "{{ groups['statistics'][0] }}" 
+INFLUX_DATABASE: "metrics_solana"
+INFLUX_USERNAME: "lrdata"
+INFLUX_PASSWORD: "password123"
+
+PRUNE_DOCKER: true
+
+REBUILD_UBUNTU_SOLANA_DOCKERFILE: "no"
+
+REBUILD_GRAFANA_DOCKERFILE: "no"
+
+# How many tasks should be run in parallel during execution of Ansible
+RUN_LOCAL: false
+SERIAL_EXECUTION_NUMBER: 0
+SERIAL_EXECUTION: "{% if RUN_LOCAL -%}1{% else %}{{SERIAL_EXECUTION_NUMBER}}{% endif %}"
+# The default hostset for Ansible, can be overwritten or set Please pay attention for variable prioritization, see:
+# https://docs.ansible.com/ansible/latest/user_guide/playbooks_variables.html
+# hostset: "local"
+
+INFLUXDB_ADMIN_USER: "admin"
+INFLUXDB_ADMIN_PASSWORD: "admin"
+#"password123"
+INFLUXDB_USER: "lrdata"
+INFLUXDB_USER_PASSWORD: "lrdata"
+#"password123"
+INFLUXDB_VERSION: "1.8.4"
+DOCKERFILE_GRAFANA: "grafana"
+
+COMMON: true
+INIT: true

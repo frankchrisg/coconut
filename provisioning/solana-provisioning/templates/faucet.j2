@@ -1,0 +1,2 @@
+#!/bin/bash
+{{ LOCAL_SOLANA_PATH }}/{{ BUILD_PATH }}//solana-faucet -k {{ KEY_PATH }}/validator-{{ groups['node'].index(item) }}-validator-keypair.json >> /solanafaucet-{{ item }}.log 2>&1 &

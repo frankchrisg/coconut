@@ -1,0 +1,5 @@
+- hosts: "{{hostset}}"
+  roles:
+    - registervars
+  vars_files:
+    - "vars/common-vars.yaml"

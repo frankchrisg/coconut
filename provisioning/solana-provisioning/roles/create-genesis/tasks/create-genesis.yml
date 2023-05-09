@@ -1,0 +1,45 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Run account creation command
+  shell: "{{ LOCAL_SOLANA_PATH }}/{{ BUILD_PATH }}/solana-keygen new -o {{ KEY_PATH }}/validator-0-{{ item }}-keypair.json --force --no-bip39-passphrase"
+  register: account_output
+  loop: "{{ ['validator', 'vote', 'stake'] | flatten(1) }}"
+  tags:
+  - bm-set
+- name: Debug account output
+  debug:
+    msg: " {{ item.stdout_lines }}"
+  loop: "{{ account_output.results }}"
+  tags:
+  - bm-set
+- name: Set genesis command
+  set_fact:
+    genesis_command:
+      "{{ LOCAL_SOLANA_PATH }}/{{ BUILD_PATH }}/solana-genesis {{ GENESIS_COMMAND_LINE }}"
+#  when: hostvars[inventory_hostname]['genesis'] is defined and hostvars[inventory_hostname]['genesis'] | bool
+- name: Debug genesis command
+  debug: 
+    msg: "{{ genesis_command }}"
+#  when: hostvars[inventory_hostname]['genesis'] is defined and hostvars[inventory_hostname]['genesis'] | bool
+  tags:
+  - bm-set
+- name: Run genesis creation command
+  shell: "{{ genesis_command }}"
+  register: genesis_output
+#  when: hostvars[inventory_hostname]['genesis'] is defined and hostvars[inventory_hostname]['genesis'] | bool
+  tags:
+  - bm-set
+- name: Debug genesis output
+  debug: 
+    msg: "{{ genesis_output.stdout }}"
+#  when: hostvars[inventory_hostname]['genesis'] is defined and hostvars[inventory_hostname]['genesis'] | bool
+  tags:
+  - bm-set
+- name: Write genesis output to file
+  copy:
+    content: "{{ genesis_output.stdout.split('hash: ')[1][0:44] }}"
+    dest: "/tmp/solanagenesis"
+#  when: hostvars[inventory_hostname]['genesis'] is defined and hostvars[inventory_hostname]['genesis'] | bool
+  tags:
+  - bm-set

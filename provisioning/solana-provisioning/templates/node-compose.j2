@@ -1,0 +1,62 @@
+version: "2"
+
+volumes:
+  {{ item }}:
+
+#networks:
+#  {{ NET_NAME }}:
+
+{% if BRIDGED_MODE -%}
+networks:
+  overlaynetwork_solana:
+    external: true
+    driver: overlay
+{% endif %}
+
+services:
+  {{ item }}:
+    container_name: {{ item }}
+    image: {{ DOCKERFILE_NAME }}
+    {% if BRIDGED_MODE -%}
+    networks:
+      overlaynetwork_solana:
+        ipv4_address: {{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(item) + 3) }}
+#    network_mode: "bridge"
+    ports:
+      - {{ ENTRY_START_PORT + groups['node'].index(item) * 100 + my_idx }}-{{ ENTRY_START_PORT + groups['node'].index(item) * 100 + my_idx + 13 }}:{{ ENTRY_START_PORT + groups['node'].index(item) * 100 + my_idx }}-{{ ENTRY_START_PORT + groups['node'].index(item) * 100 + my_idx + 13 }}
+      - {{ ENTRY_START_PORT + groups['node'].index(item) * 100 + my_idx }}-{{ ENTRY_START_PORT + groups['node'].index(item) * 100 + my_idx + 13 }}:{{ ENTRY_START_PORT + groups['node'].index(item) * 100 + my_idx }}-{{ ENTRY_START_PORT + groups['node'].index(item) * 100 + my_idx + 13 }}/udp
+      - {{ RPC_START_PORT + groups['node'].index(item) * 100 + my_idx + 1 }}:{{ RPC_START_PORT + groups['node'].index(item) * 100 + my_idx + 1 }}
+      - {{ RPC_START_PORT + groups['node'].index(item) * 100 + my_idx + 2 }}:{{ RPC_START_PORT + groups['node'].index(item) * 100 + my_idx + 2 }}
+{% if hostvars[item]['faucet'] is defined and hostvars[item]['faucet'] | bool %}
+      - 9900:9900
+{% endif %}
+   
+    {% else -%}
+    network_mode: "host"
+    {% endif %}
+
+    restart: always
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+    #    ports:
+    #      - "{{ 50000 + my_idx }}:7054"
+    tty: true
+    #command: tail -f /dev/null
+    volumes:
+      - /etc/timezone:/etc/timezone
+      - /etc/security/limits.conf:/etc/security/limits.conf
+      - /etc/sysctl.conf:/etc/sysctl.conf
+      - {{ LOCAL_SOLANA_PATH }}/{{ BUILD_PATH }}/:{{ LOCAL_SOLANA_PATH }}/{{ BUILD_PATH }}
+{% if hostvars[item]['faucet'] is defined and hostvars[item]['faucet'] | bool %}
+      - {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}_faucet_startScript.sh:{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}_faucet_startScript.sh
+{% endif %}
+      - {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}_startScript.sh:{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}_startScript.sh
+{% if hostvars[item]['genesis'] is defined and hostvars[item]['genesis'] | bool %}
+      - {{ LEDGER_PATH }}:{{ LEDGER_PATH }}
+{% else %}
+      - {{ LEDGER_PATH_BASE }}/validator-{{ groups['node'].index(item) }}:{{ LEDGER_PATH_BASE }}/validator-{{ groups['node'].index(item) }}
+{% endif %}
+      - {{ KEY_PATH }}/validator-{{ groups['node'].index(item) }}-validator-keypair.json:{{ KEY_PATH }}/validator-{{ groups['node'].index(item) }}-validator-keypair.json
+      - {{ KEY_PATH }}/validator-{{ groups['node'].index(item) }}-vote-keypair.json:{{ KEY_PATH }}/validator-{{ groups['node'].index(item) }}-vote-keypair.json
+      - {{ KEY_PATH }}/validator-{{ groups['node'].index(item) }}-stake-keypair.json:{{ KEY_PATH }}/validator-{{ groups['node'].index(item) }}-stake-keypair.json
+      - {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}_telegraf.conf:/etc/telegraf/telegraf.conf

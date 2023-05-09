@@ -1,0 +1,85 @@
+#!/bin/bash
+export RUST_LOG=solana={{ VALIDATOR_LOGGING_LEVEL }}
+{{ LOCAL_SOLANA_PATH }}/{{ BUILD_PATH }}/solana-validator \
+{% if ENABLE_EXTENDED_TX_METADATA_STORAGE == true %}--enable-extended-tx-metadata-storage \
+{% endif %}
+{% if ENABLE_RPC_TRANSACTION_HISTORY == true %}--enable-rpc-transaction-history \
+{% endif %}
+{% if ENABLE_CUDA == true %}--cuda \
+{% endif %}
+{% if ENABLE_FULL_RPC_API == true %}--full-rpc-api \
+{% endif %}
+{% if NO_POH_SPEED_TEST == true %}--no-poh-speed-test \
+{% endif %}
+{% if HALT_ON_KNOWN_VALIDATORS_ACCOUNTS_HASH_MISMATCH == true %}--halt-on-known-validators-accounts-hash-mismatch \
+{% endif %}
+{% if hostvars[item]['non_voter'] is defined and hostvars[item]['non_voter'] | bool %}--no-voting \
+{% endif %}
+{% if ENABLE_BLOCK_SUBSCRIPTION == true %}--rpc-pubsub-enable-block-subscription \
+{% endif %}
+{% if ENABLE_VOTE_SUBSCRIPTION == true %}--rpc-pubsub-enable-vote-subscription \
+{% endif %}
+{% if NO_INCREMENTAL_SNAPSHOTS == true %}--no-incremental-snapshots \
+{% endif %}
+{% if NO_SNAPSHOT_FETCH == true %}--no-snapshot-fetch \
+{% endif %}
+{% if INCREMENTAL_SNAPSHOT_INTERVAL_SLOT is defined %}`#Number of slots between generating snapshots, 0 to disable snapshots [default: 100]` \
+--incremental-snapshot-interval-slots {{ INCREMENTAL_SNAPSHOT_INTERVAL_SLOT }} \
+{% endif %}
+{% if ACCOUNT_HASH_INTERVAL_SLOTS is defined  %}`#Number of slots between generating accounts hash. [default: 100]` \
+--accounts-hash-interval-slots {{ ACCOUNT_HASH_INTERVAL_SLOTS  }} \
+{% endif %}
+{% if ENABLE_UDP == true %}--tpu-enable-udp \
+{% endif %}
+--expected-genesis-hash {{ genesis_hash.stdout }} \
+--dynamic-port-range {{ ENTRY_START_PORT + groups['node'].index(item) * 100 + my_idx }}-{{ ENTRY_START_PORT + groups['node'].index(item) * 100 + my_idx + 13 }} `# Range to use for dynamically assigned ports [default: 8000-10000]` \
+{% for host in groups['node'] %}{% if hostvars[host]['entrypoint'] is defined and hostvars[host]['entrypoint'] | bool and (hostvars[item]['genesis'] is not defined or hostvars[item]['genesis'] == false) | bool %}
+--entrypoint {{ hostvars[host]['serverip'] }}:{{ ENTRY_START_PORT + groups['node'].index(host) * 100 }} \
+{% endif %}{% endfor %}
+--full-snapshot-interval-slots {{ FULL_SNAPSHOT_INTERVAL_SLOTS }} `# Number of slots between generating full snapshots [default: 25000]`\
+--identity {{ KEY_PATH }}/validator-{{ groups['node'].index(item) }}-validator-keypair.json \
+{% if hostvars[item]['genesis'] is defined and hostvars[item]['genesis'] | bool %}
+--ledger {{ LEDGER_PATH }} \
+{% else %}
+--ledger {{ LEDGER_PATH_BASE }}/validator-{{ groups['node'].index(item) }} \
+{% endif %}
+`#--public-rpc-address {{ hostvars[item]['serverip'] }}:{{ RPC_START_PORT + groups['node'].index(item) * 100 + my_idx + 1 }}` \
+--rpc-bind-address 0.0.0.0 `#{{ hostvars[item]['serverip'] }}` \
+--bind-address 0.0.0.0 `# [default: 0.0.0.0]`\
+`#{{ hostvars[item]['serverip'] }}`\
+{% if not BRIDGED_MODE %}--public-rpc-address {{ hostvars[item]['serverip'] }}:{{ RPC_START_PORT + groups['node'].index(item) * 100 + my_idx + 1 }} \
+{% else %}--public-rpc-address {{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(item) + 3) }}:{{ RPC_START_PORT + groups['node'].index(item) * 100 + my_idx + 1 }} \
+{% endif %}
+{% for host in groups['node'] %}{% if hostvars[host]['faucet'] is defined and hostvars[host]['faucet'] | bool and faucet is not defined %}
+{% set faucet = true %}
+`#--rpc-faucet-address {{ hostvars[host]['faucet'] }}` \
+{% if not BRIDGED_MODE %}--rpc-faucet-address {{ hostvars[host]['serverip'] }}:9900 \
+{% else %}--rpc-faucet-address {{ (SWARM_PREFIX + "2") | ipmath(groups['node'].index(host) + 3) }}:9900 \
+{% endif %}
+{% endif %}{% endfor %}
+--rpc-max-multiple-accounts {{ RPC_MAX_MULTIPLE_ACCOUNTS }} \
+--rpc-max-request-body-size {{ RPC_MAX_REQUEST_BODY_SIZE }} \
+--rpc-port {{ RPC_START_PORT + groups['node'].index(item) * 100 + my_idx + 1 }} `# Enable JSON RPC on this port, and the next port for the RPC websocket` \
+--rpc-pubsub-max-active-subscriptions {{ RPC_PUBSUB_MAX_ACTIVE_SUBSCRIPTIONS }} \
+--rpc-pubsub-notification-threads {{ RPC_PUBSUB_NOTIFICATION_THREADS }} `# 0 will disable RPC PubSub notifications` \
+--rpc-pubsub-queue-capacity-bytes {{ RPC_PUBSUB_QUEUE_CAPACITY_BYTES }} \
+--rpc-pubsub-queue-capacity-items {{ RPC_PUBSUB_QUEUE_CAPACITY_ITEMS }} \
+--rpc-pubsub-worker-threads {{ RPC_PUBSUB_WORKER_THREADS }} \
+--rpc-send-retry-ms {{ RPC_SEND_RETRY_MS }} \
+--rpc-threads {{ RPC_THREADS }} \
+{% if hostvars[item]['non_voter'] is not defined or (hostvars[item]['non_voter'] is defined and not hostvars[item]['non_voter'] | bool) %}--vote-account {{ KEY_PATH }}/validator-{{ groups['node'].index(item) }}-vote-keypair.json \
+{% endif %}
+{% if NO_OS_NETWORK_LIMITS_TEST == true %}--no-os-network-limits-test \
+{% endif %}
+{% if hostvars[item]['genesis'] is defined and hostvars[item]['genesis'] | bool %}--no-wait-for-vote-to-start-leader \
+{% endif -%} 
+{% if hostvars[item]['genesis'] is defined and hostvars[item]['genesis'] | bool %}--require-tower \
+{% endif %}
+--log /validator-{{ groups['node'].index(item) }}.log \
+--allow-private-addr \
+`#--num-gen-threads {{ NUM_GEN_TX_THREADS }}` \
+{% if TPU_USE_QUIC == true %}--tpu-use-quic \
+{% endif %}
+`#[clap(long, default_value = "16384", help = "Size of the transactions batch")]` \
+`#send-batch-size {{ SEND_BATCH_SIZE }}` \
+--tpu-connection-pool-size {{ TPU_CONNECTION_POOL_SIZE }} >> /solanavalidator-{{ item }}.log 2>&1 &

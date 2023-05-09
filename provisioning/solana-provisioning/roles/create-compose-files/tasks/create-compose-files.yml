@@ -1,0 +1,44 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Create docker compose files
+  template: 
+    src: "{{ MAIN_CONFIG_PATH }}/node-compose.j2"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}_compose.yaml"
+  loop: "{{ groups['node'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Get genesis hash
+  local_action: shell cat /tmp/solanagenesis
+  register: genesis_hash
+  tags:
+  - bm-set
+- name: print genesis hash
+  debug:
+    msg: "Genesis hash: {{ genesis_hash.stdout }}" 
+  tags:
+  - bm-set
+- name: Create validator start scripts
+  template: 
+    src: "{{ MAIN_CONFIG_PATH }}/nodeStartScript.j2"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}_startScript.sh"
+  loop: "{{ groups['node'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Create faucet start scripts
+  template: 
+    src: "{{ MAIN_CONFIG_PATH }}/faucet.j2"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}_faucet_startScript.sh"
+  when: hostvars[item]['faucet'] is defined and hostvars[item]['faucet'] | bool
+  loop: "{{ groups['node'] }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set

@@ -1,0 +1,55 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Delete temporary directory for node configuration files
+  file:
+    path: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/"
+    state: absent
+  become: true
+  tags:
+  - bm-set
+- name: Create temporary directory for node configuration files
+  file:
+    path: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/"
+    state: "directory"
+  tags:
+  - bm-set
+- name: Delete solana-related directory
+  file:
+    path: "{{ BASE_PATH }}/solana-related"
+    state: absent
+  become: true
+  tags:
+  - bm-set
+- name: Delete solana genesis directory
+  file:
+    path: "{{ LEDGER_PATH }}"
+    state: absent
+  become: true
+  tags:
+  - bm-set
+- name: Create solana-related directory
+  file:
+    path: "{{ BASE_PATH }}/solana-related"
+    state: directory
+  tags:
+  - bm-set
+- name: Create solana-nodes directory
+  file:
+    path: "{{ BASE_PATH }}/solana-related/solana-nodes"
+    state: directory
+  tags:
+  - bm-set
+- name: Delete key directory
+  file:
+    path: "{{ KEY_PATH }}"
+    state: absent
+  become: true
+  tags:
+  - bm-set
+- name: Create key directory
+  file:
+    path: "{{ KEY_PATH }}" 
+    state: directory
+  tags:
+  - bm-set

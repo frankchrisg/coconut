@@ -1,0 +1,35 @@
+# This file containing various hosts is used for building
+# a flexible and scalable network of Solana
+
+[all:vars]
+ansible_port=22
+ansible_python_interpreter=/usr/bin/python3
+ansible_user=parallels
+ansible_become_user=root
+ansible_ssh_pass=password123
+ansible_become_pass=password123
+
+[local]
+localhost ansible_connection=local
+
+# Currently only one server is expected to serve statistics
+[statistics]
+192.168.178.124 serverip=192.168.178.124
+#10.28.55.240 serverip=10.28.55.240
+
+[node]
+node0.node.com serverip=192.168.178.124 genesis=true entrypoint=true faucet=true
+node1.node.com serverip=192.168.178.124
+#node2.node.com serverip=10.28.55.241
+#node3.node.com serverip=10.28.55.242
+
+#non_voter
+
+[realservers]
+192.168.178.124 telegraf=true swarmmanager=true
+192.168.178.137 executor_main=true
+#10.28.55.239 telegraf=true swarmworker=true
+#10.28.55.240 telegraf=true
+#10.28.55.241 telegraf=true
+#10.28.55.242 telegraf=true
+#10.28.55.243 executor_main=true

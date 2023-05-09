@@ -1,0 +1,40 @@
+- name: Add IP addresses to container
+  shell: "echo \"echo {{ hostvars[item]['serverip'] }} {{item}} >> /etc/hosts\" | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: BRIDGED_MODE and hostvars[item]['serverip'] is defined
+  loop: "{{ groups.all }}"
+  tags:
+  - bm-set
+
+- name: Start faucet
+  shell: "echo '/bin/bash {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}_faucet_startScript.sh' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: hostvars[inventory_hostname]['faucet'] is defined and hostvars[inventory_hostname]['faucet'] | bool
+  tags:
+  - bm-run
+
+- name: Start node
+  shell: "echo '/bin/bash {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ inventory_hostname }}_startScript.sh' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  tags:
+  - bm-run
+
+- name: Check for existing snapshot
+  shell: "curl -X POST -H 'Content-Type: application/json' -s 'http://{{ GENESIS_NODE_ADDRESS }}' --data '{\"jsonrpc\":\"2.0\",\"id\":1, \"method\":\"getEpochInfo\"}' | jq '.result.absoluteSlot'"
+  register: snapshots
+  until: "snapshots.stdout | int > SNAPSHOT_CONDITION | int"
+  retries: "{{ RETRIES_SNAPSHOT_CATCH_UP }}"
+  delay: "{{ DELAY_SNAPTSHOT_CATCH_UP }}"
+  throttle: 1
+  when: hostvars[inventory_hostname]['genesis'] is not defined or not hostvars[inventory_hostname]['genesis'] | bool
+  tags:
+  - bm-run
+- name: Check snapshot output
+  debug:
+    msg: " {{ snapshots.stdout }}"
+  when: hostvars[inventory_hostname]['genesis'] is not defined or not hostvars[inventory_hostname]['genesis'] | bool
+  tags:
+  - bm-run
+ 
+- name: Initialise telegraf 
+#  shell: "echo 'apt update && apt-get install -y software-properties-common gnupg curl &&  curl -sL https://repos.influxdata.com/influxdb.key | apt-key add - && apt-add-repository \"deb https://repos.influxdata.com/ubuntu bionic stable\" && apt-get install -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" telegraf && service telegraf restart' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  shell: "echo 'service telegraf restart' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  tags:
+  - bm-set

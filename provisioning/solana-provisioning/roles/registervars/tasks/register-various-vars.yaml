@@ -1,0 +1,13 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Register home directory
+  shell: "echo $HOME"
+  register: homeDir
+  tags:
+  - bm-set
+- name: Echo home directory
+  debug:
+    msg: "{{ homeDir.stdout }}"
+  tags:
+  - bm-set
