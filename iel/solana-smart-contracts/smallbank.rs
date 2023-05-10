@@ -612,7 +612,7 @@ impl BorshDeserialize for SmallBankInstruction {
         msg!("Destination pubkey: {:?}", destination_pubkey);
         msg!("Sender acct ID: {}", acct_id0);
         msg!("Destination acct ID: {}", acct_id1);
-        msg!("Signature: {}", sig);
+        msg!("Signature: {}", sig);*/
 
 Ok(SmallBankInstruction::Amalgamate { sender_pubkey, destination_pubkey, acct_id0, acct_id1, sig })
 }
