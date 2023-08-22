@@ -1,3 +1,7 @@
+The process for initiating a private Eth2 dev-/testnet is currently under-documented, leaving many developers in need of guidance. To address this gap, we present a set of comprehensive guidelines to streamline the setup.
+
+---
+
 To run Prysm, the following versions have been tested:
 Geth version: e2507a17e8df5bb84b4b1195cf6a2d58e3ba109c
 Prysm version: e545b57f260837e14317248cfda046616431b8a3 (https://github.com/prysmaticlabs/prysm)
@@ -33,7 +37,7 @@ That's it, verify block creation. Adjust further parameters according to your ne
 
 To run Lighthouse, the following versions have been tested:
 Geth version: e2507a17e8df5bb84b4b1195cf6a2d58e3ba109c
-Lighthouse: 59c24bcd2d83f1fcafc6ee4db9cf7b6f88ed7459
+Lighthouse: 59c24bcd2d83f1fcafc6ee4db9cf7b6f88ed7459 (https://github.com/sigp/lighthouse)
 
 Notes:
 - you can use the Ethereum v1 provisioning provided by COCONUT
@@ -66,7 +70,7 @@ That's it, verify block creation. Adjust further parameters according to your ne
 
 To run Teku, the following versions have been tested:
 Geth version: e2507a17e8df5bb84b4b1195cf6a2d58e3ba109c
-Teku version: b54882aae2389f8bddd7522076b1c982401017d5
+Teku version: b54882aae2389f8bddd7522076b1c982401017d5 (https://github.com/Consensys/teku)
 
 Notes:
 - you can use the Ethereum v1 provisioning provided by COCONUT
@@ -113,7 +117,7 @@ That's it, verify block creation. Adjust further parameters according to your ne
 
 To run Lodestar, the following versions have been tested:
 Geth version: e2507a17e8df5bb84b4b1195cf6a2d58e3ba109c
-Lodestar version: 7546292ef150c37a9a912b349d51f8ea59f686fb
+Lodestar version: 7546292ef150c37a9a912b349d51f8ea59f686fb (https://github.com/ChainSafe/lodestar)
 
 Notes:
 - you can use the Ethereum v1 provisioning provided by COCONUT
@@ -158,7 +162,7 @@ That's it, verify block creation. Adjust further parameters according to your ne
 ---
 
 To run Nimbus, the following versions have been tested:
-Nimbus version: 1bc9f3a67ac519ab4f889ca19abfd74f5e07c205
+Nimbus version: 1bc9f3a67ac519ab4f889ca19abfd74f5e07c205 (https://github.com/status-im/nimbus-eth2)
 Geth: Custom from https://github.com/status-im/nimbus-simulation-binaries/releases
 
 Notes:
