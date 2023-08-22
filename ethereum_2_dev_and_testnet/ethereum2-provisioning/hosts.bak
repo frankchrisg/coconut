@@ -1,0 +1,33 @@
+# This file containing various hosts is used for building
+# a flexible and scalable network of Ethereum
+
+[all:vars]
+ansible_port=22
+ansible_python_interpreter=/usr/bin/python3
+ansible_user=parallels
+ansible_become_user=root
+ansible_ssh_pass=praktikum123
+ansible_become_pass=praktikum123
+
+[local]
+localhost ansible_connection=local
+
+# Currently only one server is expected to serve statistics
+[statistics]
+192.168.178.177 serverip=192.168.178.177
+
+[node]
+node0.node.com serverip=192.168.178.137 signer=true
+node1.node.com serverip=192.168.178.137 signer=true
+##node2.node.com serverip=192.168.178.137 signer=true
+##node3.node.com serverip=192.168.178.137 signer=true
+###node1.node.com serverip=192.168.178.137 signer=true
+#node2.node.com serverip=10.28.55.241 signer=true
+#node3.node.com serverip=10.28.55.242 signer=true
+
+[realservers]
+#10.28.55.239 telegraf=true
+#10.28.55.240 telegraf=true
+#10.28.55.241 telegraf=true
+192.168.178.137 telegraf=true
+192.168.178.177 executor_main=true

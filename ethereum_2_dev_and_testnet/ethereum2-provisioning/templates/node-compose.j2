@@ -1,0 +1,69 @@
+version: "2"
+
+volumes:
+  {{ item }}:
+
+#networks:
+#  {{ NET_NAME }}:
+
+{% if BRIDGED_MODE -%}
+networks:
+  ethereum:
+{% endif %}
+
+services:
+  {{ item }}:
+    container_name: {{ item }}
+    image: {{ DOCKERFILE_NAME }}
+    {% if BRIDGED_MODE -%}
+    network_mode: "bridge"
+    ports:
+#      - {{ P2P_START_PORT + groups['node'].index(item) * 100 + my_idx }}:{{ P2P_START_PORT + groups['node'].index(item) * 100 + my_idx }}
+#      - {{ P2P_START_PORT + groups['node'].index(item) * 100 + my_idx + additional_nodes_per_container[groups['node'].index(item)].number | int }}:{{ P2P_START_PORT + groups['node'].index(item) * 100 + my_idx + additional_nodes_per_container[groups['node'].index(item)].number | int }}
+      {% for n in range(additional_nodes_per_container[groups['node'].index(item)].number | int) -%}
+      - {{ P2P_START_PORT + groups['node'].index(item) * 100 + n }}:{{ P2P_START_PORT + groups['node'].index(item) * 100 + n }}
+      {% endfor %}
+      
+#      - {{ RPC_START_PORT + groups['node'].index(item) * 100 + my_idx }}:{{ RPC_START_PORT + groups['node'].index(item) * 100 + my_idx }}
+      
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int) -%}
+      - {{ RPC_START_PORT + groups['node'].index(item) * 100 + n }}:{{ RPC_START_PORT + groups['node'].index(item) * 100 + n }}
+      {% endfor %}
+            
+#      - {{ WS_START_PORT + groups['node'].index(item) * 100 + my_idx }}:{{ WS_START_PORT + groups['node'].index(item) * 100 + my_idx }}
+
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int) -%}
+      - {{ WS_START_PORT + groups['node'].index(item) * 100 + n }}:{{ WS_START_PORT + groups['node'].index(item) * 100 + n }}
+      {% endfor %}      
+
+#      - {{ CONSENSUS_START_PORT + groups['node'].index(item) * 100 + my_idx }}:{{ CONSENSUS_START_PORT + groups['node'].index(item) * 100 + my_idx }}
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int) -%}
+      - {{ CONSENSUS_START_PORT + groups['node'].index(item) * 100 + n }}:{{ CONSENSUS_START_PORT + groups['node'].index(item) * 100 + n }}
+      {% endfor %}
+
+      {% for n in range(numberOfNodes.results[groups['node'].index(item)].item.number | int) -%}
+      - {{ AUTH_RPC_PORT + groups['node'].index(item) * 100 + n }}:{{ AUTH_RPC_PORT + groups['node'].index(item) * 100 + n }}
+      {% endfor %}
+      
+    {% else -%}
+    network_mode: "host"
+    {% endif %}
+
+    restart: always
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+    #    ports:
+    #      - "{{ 50000 + my_idx }}:7054"
+    tty: true
+    #command: tail -f /dev/null
+    volumes:
+      - /etc/timezone:/etc/timezone
+      - /etc/security/limits.conf:/etc/security/limits.conf
+      - /etc/sysctl.conf:/etc/sysctl.conf
+      - {{ BUILD_PATH }}:{{ BUILD_PATH}}
+      - {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/passwordfile.txt:/passwordfile.txt
+      - {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/getKeys.sh:/getKeys.sh
+      - {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/getKeysSigner.sh:/getKeysSigner.sh
+      - {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/nodes
+      - {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/{{ item }}_telegraf.conf:/etc/telegraf/telegraf.conf
+      - {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/secret.txt:/secret.txt

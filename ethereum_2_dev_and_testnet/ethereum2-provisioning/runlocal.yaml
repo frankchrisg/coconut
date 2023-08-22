@@ -1,0 +1,13 @@
+- import_playbook: init.yaml SERIAL_EXECUTION_PB=100 hostset=realservers
+  when: INIT is defined and INIT | bool
+- import_playbook: common.yaml SERIAL_EXECUTION_PB=100 hostset=realservers
+  when: COMMON is defined and COMMON | bool
+- import_playbook: create-compose-files.yaml SERIAL_EXECUTION_PB=100 hostset=local
+- import_playbook: prepare-environment.yaml SERIAL_EXECUTION_PB=100 hostset=node
+- import_playbook: prepare-container-environment.yaml SERIAL_EXECUTION_PB=1 hostset=node
+- import_playbook: create-genesis.yaml SERIAL_EXECUTION_PB=100 hostset=local
+- import_playbook: prepare-container-files.yaml SERIAL_EXECUTION_PB=1 hostset=node
+- import_playbook: prepare-start-nodes.yaml SERIAL_EXECUTION_PB=100 hostset=node
+- import_playbook: statistics.yaml SERIAL_EXECUTION_PB=100 hostset=statistics
+- import_playbook: start-nodes.yaml SERIAL_EXECUTION_PB=100 hostset=node
+###- import_playbook: setup-contracts.yaml SERIAL_EXECUTION_PB=100 hostset=node

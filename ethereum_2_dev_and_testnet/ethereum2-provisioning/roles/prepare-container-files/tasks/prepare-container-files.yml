@@ -1,0 +1,59 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+
+- name: Get account keys
+  shell: "echo '/bin/bash getKeys.sh' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  register: keys
+  when: CONDITION_FOR_KEYS
+  tags:
+  - bm-set
+- name: Output keys
+  debug:
+    msg: "{{ keys.stdout_lines | list }}"
+  register: keys_content
+  when: CONDITION_FOR_KEYS
+  tags:
+  - bm-set
+- name: Execute bootnode --genkey | Number {{ numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int }}
+  shell: "echo '{{ BUILD_PATH }}/bootnode --genkey=/nodes/node-{{ item }}/nodekey' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  tags:
+  - bm-set
+- name: Execute bootnode --nodekey | Number {{ numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int }}
+  shell: "echo '{{ BUILD_PATH }}/bootnode --nodekey=/nodes/node-{{ item }}/nodekey --writeaddress > /nodes/node-{{ item }}/enode' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  tags:
+  - bm-set
+- name: Get enodes from {{ inventory_hostname }}
+  shell: "echo 'cat /nodes/node-*/enode' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  register: enodes
+  tags:
+  - bm-set
+- name: Output enodes
+  debug:
+    msg: "{{ enodes.stdout_lines }}"
+  register: enodesLines
+  tags:
+  - bm-set
+- name: "Output enode lines"
+  debug:
+    msg: "{{ enodesLines.msg }}"
+  register: enodesToFill
+  tags:
+  - bm-set
+
+- name: Handle enodes
+  block:
+    - name: Insert enodes
+      local_action: lineinfile line="\"enode://{{ item }}@{{ hostvars[inventory_hostname]['serverip'] }}:{{ P2P_START_PORT + groups['node'].index(inventory_hostname) * 100 + my_idx }}?discport=0\",\n\n" insertbefore="]" dest="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/enodes.json"
+      loop: "{{ enodesToFill.msg | default([]) }}"
+      loop_control:
+        loop_var: item
+        index_var: my_idx
+    - name: Delete additional keys
+      local_action: shell /bin/sed -i '0,/^.*{{ hostvars[inventory_hostname]['serverip'] }}.*/{/^.*{{ hostvars[inventory_hostname]['serverip'] }}.*/d}' {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/enodes.json warn="false"
+      loop: "{% if additional_nodes_per_container[groups['node'].index(inventory_hostname)].nodes_to_remove_from_enodes | int is defined and additional_nodes_per_container[groups['node'].index(inventory_hostname)].nodes_to_remove_from_enodes | int > 0 %}{{ range(0, additional_nodes_per_container[groups['node'].index(inventory_hostname)].nodes_to_remove_from_enodes | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  throttle: 1
+  tags:
+  - bm-set

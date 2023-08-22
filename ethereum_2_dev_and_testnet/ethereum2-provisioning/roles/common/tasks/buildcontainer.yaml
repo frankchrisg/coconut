@@ -1,0 +1,19 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Restart Docker daemon
+  systemd:
+    state: restarted
+    daemon_reload: yes
+    name: docker
+  become: true
+- name: Build an Ubuntu image for ethereum
+  docker_image:
+    build:
+      network: host
+      path: "{{ DOCKERFILE_PATH }}/"
+      nocache: "yes"
+      pull: "yes"
+    name: ubuntu-ethereum
+    force: "{{ REBUILD_UBUNTU_ETHEREUM_DOCKERFILE }}"
+    source: "build"

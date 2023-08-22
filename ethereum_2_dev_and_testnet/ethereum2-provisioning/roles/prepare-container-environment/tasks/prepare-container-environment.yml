@@ -1,0 +1,78 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Create directories for additional nodes and register initial accounts {{ numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int }} times
+  shell: "echo 'mkdir -p /nodes/node-{{ item }}/data/geth && {{ BUILD_PATH }}/geth --datadir /nodes/node-{{ item }} account new --password passwordfile.txt' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number is defined
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Output status of CONDITION_FOR_KEYS
+  debug:
+    msg: "{{ CONDITION_FOR_KEYS }}"
+  tags:
+  - bm-set
+- name: Get account keys
+  shell: "echo '/bin/bash getKeys.sh' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  register: keys
+  when: CONDITION_FOR_KEYS
+  tags:
+  - bm-set
+- name: Output keys
+  debug:
+    msg: "{{ keys.stdout_lines | list }}"
+  register: keys_content
+  when: CONDITION_FOR_KEYS
+  tags:
+  - bm-set
+  
+- name: Handle enode nodekeys
+  block:
+    - name: Create file on local host for storing keys depending on the given condition, {{ CONDITION_FOR_KEYS }}
+      local_action: lineinfile line="{{ item }}" insertbefore=BOF create="yes" dest="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/enodes_local.json" 
+      loop: "{{ keys_content.msg }}"
+      loop_control:
+        loop_var: item
+        index_var: my_idx
+    - name: Create local_nodekeys_validator.txt
+      file:
+        path: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/local_nodekeys_validator.txt"
+        state: touch
+    - name: Create local_nodekeys_validator.txt (local)
+      local_action: file path="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/local_nodekeys_validator.txt" state="touch"
+  throttle: 1
+  tags:
+  - bm-set
+
+- name: Register signer accounts {{ numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int }} times
+  shell: "echo 'mkdir -p {{ SIGNER_DIR }} && {{ BUILD_PATH }}/geth --datadir {{ SIGNER_DIR }} account new --password passwordfile.txt' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  when: numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number is defined
+  loop: "{% if numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int is defined and numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int > 0 %}{{ range(0, numberOfNodes.results[groups['node'].index(inventory_hostname)].item.number | int)|list }}{% else %}{{ range(0, 0)|list }}{% endif %}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  tags:
+  - bm-set
+- name: Get signer account keys
+  shell: "echo '/bin/bash getKeysSigner.sh' | docker exec -i {{ inventory_hostname }} /bin/bash -"
+  register: signerkeys
+  tags:
+  - bm-set
+- name: Output signer keys
+  debug:
+    msg: "{{ signerkeys.stdout_lines | list }}"
+  register: signerkeys_content
+  tags:
+  - bm-set
+- name: Create file on local host for storing signer keys
+  local_action: lineinfile line="{{ item }}" insertbefore=BOF create="yes" dest="{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/signer_keys.txt"
+  loop: "{{ signerkeys_content.msg }}"
+  loop_control:
+    loop_var: item
+    index_var: my_idx
+  throttle: 1
+  tags:
+  - bm-set

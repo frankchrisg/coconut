@@ -1,0 +1,85 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Delete temporary directory for node configuration files
+  file:
+    path: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/"
+    state: absent
+  become: true
+  tags:
+  - bm-set
+- name: Create temporary directory for node configuration files
+  file:
+    path: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/"
+    state: "directory"
+  tags:
+  - bm-set
+#- name: Remove ethereum directory
+#  file:
+#    path: "{{ LOCAL_ETHEREUM_PATH }}"
+#    state: absent
+#  become: true
+- name: Delete ethereum-related directory
+  file:
+    path: "{{ BASE_PATH }}/ethereum-related"
+    state: absent
+  tags:
+  - bm-set
+- name: Create ethereum-related directory
+  file:
+    path: "{{ BASE_PATH }}/ethereum-related"
+    state: directory
+  tags:
+  - bm-set
+- name: Create ethereum-nodes directory
+  file:
+    path: "{{ BASE_PATH }}/ethereum-related/ethereum-nodes"
+    state: directory
+  tags:
+  - bm-set
+- name: Delete keys.txt
+  file:
+    path: "{{ MAIN_CONFIG_PATH }}/keys.txt"
+    state: absent
+  tags:
+  - bm-set
+- name: Create keys.txt
+  file:
+    path: "{{ MAIN_CONFIG_PATH }}/keys.txt" 
+    state: touch
+  tags:
+  - bm-set
+- name: Delete wallets.txt
+  file:
+    path: "{{ MAIN_CONFIG_PATH }}/wallets.txt"
+    state: absent
+  tags:
+  - bm-set
+- name: Create wallets.txt
+  file:
+    path: "{{ MAIN_CONFIG_PATH }}/wallets.txt"
+    state: touch
+  tags:
+  - bm-set
+- name: Prepare enodes.json step 1
+  lineinfile:
+    line: "[\n\n"
+    insertbefore: BOF
+    create: "yes"
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/enodes.json"
+  tags:
+  - bm-set
+- name: Prepare enodes.json step 2
+  lineinfile:
+    line: "\n\n]"
+    insertbefore: EOF
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/enodes.json"
+  tags:
+  - bm-set
+
+- name: "Create secret.txt here: {{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/secret.txt"
+  copy:
+    dest: "{{ NODE_CONFIGURATION_PATH_AND_DOCKER_COMPOSE_PATH }}/secret.txt"
+    content: "2e0834786285daccd064ca17f1654f67b4aef298acbb82cef9ec422fb4975622"
+  tags:
+  - bm-set

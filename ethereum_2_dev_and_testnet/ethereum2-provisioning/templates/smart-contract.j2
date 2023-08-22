@@ -1,0 +1,11 @@
+#!/usr/bin/expect
+
+set contractName [lindex $argv 0];
+
+set timeout -1
+
+spawn {{ BUILD_PATH }}/geth attach {{ PREFERRED_CONTRACT_NODE_DIR }}/geth.ipc
+send loadScript("$contractName")\r
+expect "CTAddress"
+send "\x04"
+

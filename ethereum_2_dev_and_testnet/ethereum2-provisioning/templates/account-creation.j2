@@ -1,0 +1,24 @@
+#!/bin/bash
+pids=""
+RESULT=0
+
+for d in /nodes/* ; do for i in $(seq 1 {{ NUMBER_OF_ACCOUNTS_PER_NODE }}); do
+  echo $({{ BUILD_PATH }}/geth account new --password /passwordfile.txt {% if LIGHTKDF is defined and LIGHTKDF | bool %} --lightkdf {% endif %} --datadir "$d") &
+  pids="$pids $!"
+  echo "$pids"
+done;
+done
+
+for pid in $pids; do
+  wait "$pid" || let "RESULT=1"
+  echo "$RESULT : $pid"
+done
+
+if [ "$RESULT" == "1" ];
+then
+  echo "Failed"
+  exit 1
+else
+  echo "Done"
+  exit 0
+fi
