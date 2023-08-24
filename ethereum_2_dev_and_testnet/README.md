@@ -5,7 +5,9 @@ Using one of the listed programs requires to download or clone the associated re
 ---
 ### Prysm
 To run Prysm, the following versions have been tested:
+
 Geth version: e2507a17e8df5bb84b4b1195cf6a2d58e3ba109c
+
 Prysm version: e545b57f260837e14317248cfda046616431b8a3 (https://github.com/prysmaticlabs/prysm)
 
 Notes:
@@ -50,7 +52,9 @@ That's it, verify block creation. Adjust further parameters according to your ne
 ---
 ### Lighthouse
 To run Lighthouse, the following versions have been tested:
+
 Geth version: e2507a17e8df5bb84b4b1195cf6a2d58e3ba109c
+
 Lighthouse: 59c24bcd2d83f1fcafc6ee4db9cf7b6f88ed7459 (https://github.com/sigp/lighthouse)
 
 Notes:
@@ -90,7 +94,9 @@ That's it, verify block creation. Adjust further parameters according to your ne
 ---
 ### Teku
 To run Teku, the following versions have been tested:
+
 Geth version: e2507a17e8df5bb84b4b1195cf6a2d58e3ba109c
+
 Teku version: b54882aae2389f8bddd7522076b1c982401017d5 (https://github.com/Consensys/teku)
 
 Notes:
@@ -101,7 +107,7 @@ Notes:
 - we provide an adjusted template for the mainnet.yaml
 - adjust the copyvalidators.sh file in the provided directory
 
-Run gradlew in the source directory of Teku:
+Run gradlew in the source directory of Teku (make sure to use the correct Java version):
 
 `./gradlew installDist`
 
@@ -139,7 +145,7 @@ Start the beacon-chain and the validator for one node:
 
 Get the enr of the first node:
 
-`curl -X GET "http://localhost:5051/eth/v1/node/identity`
+`curl -X GET "http://localhost:5051/eth/v1/node/identity"`
 
 Start the second beacon-chain and the second validator for another node (replace the enr with the one previously obtained):
 
@@ -152,7 +158,9 @@ That's it, verify block creation. Adjust further parameters according to your ne
 ---
 ### Lodestar
 To run Lodestar, the following versions have been tested:
+
 Geth version: e2507a17e8df5bb84b4b1195cf6a2d58e3ba109c
+
 Lodestar version: 7546292ef150c37a9a912b349d51f8ea59f686fb (https://github.com/ChainSafe/lodestar)
 
 Notes:
@@ -173,7 +181,7 @@ Delete any lodestar directories and the associated config directories on every n
 
 `rm -rf add_conf/keystores* add_conf/secrets`
 
-Create a genesis file:
+Create a genesis file (make sure add_conf/config.yaml exists):
 
 `./lodestar dev --dumpTestnetFiles add_conf --genesisValidators 80 --genesisTime $(( $(date +%s) + 60 )) --paramsFile=add_conf/config.yaml --reset`
 
@@ -210,7 +218,9 @@ That's it, verify block creation. Adjust further parameters according to your ne
 ---
 ### Nimbus
 To run Nimbus, the following versions have been tested:
+
 Nimbus version: 1bc9f3a67ac519ab4f889ca19abfd74f5e07c205 (https://github.com/status-im/nimbus-eth2)
+
 Geth: Custom from https://github.com/status-im/nimbus-simulation-binaries/releases
 
 Notes:
@@ -224,13 +234,15 @@ To build the binary, run:
 
 To get some bootstrap files, run (you may abort execution, when all bootstrap files are present):
 
-`bash -x scripts/launch_local_testnet.sh --data-dir xxxxp --preset minimal --nodes 2 --capella-fork-epoch 3 --deneb-fork-epoch 20 --stop-at-epoch 10 --disable-htop --base-port 5011 --base-rest-port 6011 --base-metrics-port 7011 --base-el-net-port 8011 --base-el-rpc-port 9011 --base-el-ws-port 10111 --base-el-auth-rpc-port 11111 --el-port-offset 5 --disable-vc --reuse-binaries --run-geth --dl-geth -- --verify-finalization`
+`bash -x scripts/launch_local_testnet.sh --data-dir xxxx2 --preset minimal --nodes 2 --capella-fork-epoch 3 --deneb-fork-epoch 20 --stop-at-epoch 10 --disable-htop --base-port 5011 --base-rest-port 6011 --base-metrics-port 7011 --base-el-net-port 8011 --base-el-rpc-port 9011 --base-el-ws-port 10111 --base-el-auth-rpc-port 11111 --el-port-offset 5 --disable-vc --reuse-binaries --run-geth --dl-geth -- --verify-finalization`
 
 Remove any unneeded files:
 
 `rm -rf xxxx2/geth-0/ xxxx2/node1/ xxxx2/validators/* xxxx2/secrets/* xxxx3/ xxxx2/node2/`
 
 \# the most needed files in the xxxx2 directory are *execution_genesis.json*, *execution_genesis_block.json*, *config.toml*, *config.yaml*, *keymanager-token*, *network_key.json*, *deposit_contract_block.txt*, *deposit_contract_block_hash.txt* and *deposit_contract.txt*
+
+\# you may adjust the *config.yaml* file here
 
 Generate the deposits:
 
@@ -301,3 +313,9 @@ or check for the block data, like:
 `eth.getBlock(71)`
 
 this could be useful to check different nodes to sync the same blocks
+
+---
+
+- Wait some time, before blocks are created
+- Errors during the forks may happen, so wait some time to see if the error resolves itself
+- Recompile the binaries with custom code changes in case some values you want to change are hard coded
