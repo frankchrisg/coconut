@@ -23,8 +23,9 @@ public class PublicKey implements ByteSerializable, Serializable {
         if (publicKey.isCompressed()) {
             return publicKey.getPubKey();
         } else {
-            publicKey = ECKey.fromPublicOnly(publicKey.getPubKeyPoint());
+            publicKey = //ECKey.fromPublicOnly(publicKey.getPubKeyPoint(), false);
                     //ECKey.compressPoint(publicKey.getPubKeyPoint()));
+                    ECKey.fromPublicOnly(ECKey.compressPoint(publicKey.getPubKeyPoint()));
             return publicKey.getPubKey();
         }
     }
@@ -57,6 +58,7 @@ public class PublicKey implements ByteSerializable, Serializable {
         if (!pk.isCompressed()) {
             /*ECPoint point = ECKey.compressPoint(pk.getPubKeyPoint());
             pk = ECKey.fromPublicOnly(point);*/
+            //pk = ECKey.fromPublicOnly(pk.getPubKeyPoint(), false);
             pk = ECKey.fromPublicOnly(pk.getPubKeyPoint());
         }
         return new Address(pk).toString();

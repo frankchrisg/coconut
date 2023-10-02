@@ -119,7 +119,7 @@ save <- function(titleVar, plot) {
   fileName = tolower(gsub(
     " ",
     "",
-    paste("C:/Users/parallels/Downloads/final-plots/blockdata/", titleVar, ".png"),
+    paste("C:/Users/frank/Downloads/final-plots/blockdata/", titleVar, ".png"),
     fixed = TRUE
   ))
   ggsave(
@@ -141,8 +141,8 @@ save <- function(titleVar, plot) {
   )
 }
 
-fNameAllBlocks <- "C:/Users/parallels/Downloads/allblockdataonly"
-fNameAllBlocksFailed <- "C:/Users/parallels/Downloads/allfailedx3"
+fNameAllBlocks <- "C:/Users/frank/Downloads/allblockdataonly"
+fNameAllBlocksFailed <- "C:/Users/frank/Downloads/allfailedx3"
 
 allBlocks <- prepareFiles(fNameAllBlocks)
 failedBlocks <- prepareFiles(fNameAllBlocksFailed)
@@ -154,7 +154,7 @@ failedTemp <- failedTemp[, colnames(allBlocks)]
 allBlocks <- rbind(allBlocks, failedTemp)
 
 fNameFullAllRep <-
-  "C:/Users/parallels/Downloads/failed7query-rt-cid-rid-data-1657982395344.csv" #fabric
+  "C:/Users/frank/Downloads/failed7query-rt-cid-rid-data-1657982395344.csv" #fabric
 allBlocksRep <- prepareFiles(fNameFullAllRep)
 allBlocksRep <- allBlocksRep[allBlocksRep$run_id != "4000000-sawtoothConfiguration-keyvalue-set-40-flalv-rn-1-hetzner-repid-0-sawtooth-rl-400-notpbpc-100-nobpc-1-maxbtperbl-100000-notppc-100-cpbftbpd-2",]
 allBlocksRep <- allBlocksRep[allBlocksRep$run_id != "4000000-sawtoothConfiguration-sb-sendPayment-40-flalv-rn-1-hetzner-repid-0-sawtooth-rl-200-notpbpc-100-nobpc-1-maxbtperbl-100000-notppc-100-cpbftbpd-1",]
@@ -196,8 +196,8 @@ generalGroup <-
 
 #####
 
-fNameAllBlocksCid <- "C:/Users/parallels/Downloads/allblockdataonly"
-fNameAllBlocksFailedCid <- "C:/Users/parallels/Downloads/allfailedx3"
+fNameAllBlocksCid <- "C:/Users/frank/Downloads/allblockdataonly"
+fNameAllBlocksFailedCid <- "C:/Users/frank/Downloads/allfailedx3"
 
 allBlocksCid <- prepareFilesWithoutRepidReplacement(fNameAllBlocksCid)
 failedBlocksCid <- prepareFiles(fNameAllBlocksFailedCid)
@@ -209,7 +209,7 @@ failedTempCid <- failedTempCid[, colnames(allBlocksCid)]
 allBlocksCid <- rbind(allBlocksCid, failedTempCid)
 
 fNameFullAllRepCid <-
-  "C:/Users/parallels/Downloads/failed7query-rt-cid-rid-data-1657982395344.csv" #fabric
+  "C:/Users/frank/Downloads/failed7query-rt-cid-rid-data-1657982395344.csv" #fabric
 allBlocksRepCid <- prepareFilesWithoutRepidReplacement(fNameFullAllRepCid)
 allBlocksRepCid <- allBlocksRepCid[!(allBlocksRepCid$run_id %like% "4000000-sawtoothConfiguration-keyvalue-set-40-flalv-rn-1-hetzner-repid-.*-sawtooth-rl-400-notpbpc-100-nobpc-1-maxbtperbl-100000-notppc-100-cpbftbpd-2"),]
 allBlocksRepCid <- allBlocksRepCid[!(allBlocksRepCid$run_id %like% "4000000-sawtoothConfiguration-sb-sendPayment-40-flalv-rn-1-hetzner-repid-.*-sawtooth-rl-200-notpbpc-100-nobpc-1-maxbtperbl-100000-notppc-100-cpbftbpd-1"),]
@@ -516,3 +516,49 @@ for (benchmark in benchmarkList) {
   
 }
 blockPlot
+
+# newTables ---------------------------------------------------------------
+
+longFormatBak <- longFormat
+longFormatBak$RL <- apply(longFormatBak, 1, function(x) gsub("RL=", " ", x[["RL"]], fixed = TRUE))
+longFormatBak <- longFormatBak[order(longFormatBak$RL,decreasing=TRUE),]
+longFormatBak <- longFormatBak[order(longFormatBak$Category,decreasing=FALSE),]
+
+longFormatBak$variable <- str_replace(longFormatBak$variable, "mact$", "Mean actions per block")
+longFormatBak <- longFormatBak[!(longFormatBak$variable=="Mean actions per block"),]
+
+longFormatBak <- longFormatBak[,-3:-7]
+longFormatBak$variable <- str_replace(longFormatBak$variable, "countVarMean$", "Mean number of blocks")
+longFormatBak$variable <- str_replace(longFormatBak$variable, "countVarMeanEmpty$", "Mean number of empty blocks")
+longFormatBak$variable <- str_replace(longFormatBak$variable, "mtxs$", "Mean transactions per block")
+longFormatBak$variable <- str_replace(longFormatBak$variable, "mblocks$", "Mean number of blocks by datapoint")
+
+longFormatBak$value <- round(longFormatBak$value, digits = 2)
+longFormatBak$Category <- apply(longFormatBak, 1, function(x) gsub("BI=|BP=|BS=|MM=|PD=", " ", x[["Category"]], fixed = FALSE))
+names(longFormatLatencyBak)[names(longFormatLatencyBak) == 'variable'] <- 'Variable'
+names(longFormatLatencyBak)[names(longFormatLatencyBak) == 'value'] <- 'Value'
+
+makeTbl <- function(tbl, cpt, aln1, aln2) {
+  xt <-
+    xtable(
+      tbl,
+      digits = 2,
+      align = aln1,
+      caption = cpt,
+      sanitize.text.function = identity
+    )
+  
+  #digits(xt) <- 4
+  align(xt) <- xalign(xt)
+  #digits(xt) <- xdigits(xt)
+  display(xt) <- xdisplay(xt)
+  
+  print(
+    xtable(xt, align = aln2, caption = cpt),
+    #"Sawtooth"),
+    include.rownames = FALSE,
+    sanitize.text.function = identity
+  )
+}
+
+makeTbl(longFormatBak, "x", "ccccc", "ccc|cc")

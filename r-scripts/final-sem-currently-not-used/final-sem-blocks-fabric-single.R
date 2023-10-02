@@ -23,7 +23,7 @@ source(
 source("https://raw.githubusercontent.com/easystats/see/master/R/geom_violindot.R")
 
 basicSystem <-
-  read.table('C:/Users/parallels/Downloads/fabric.txt',
+  read.table('C:/Users/frank/Downloads/fabric.txt',
              sep = '&',
              comment.char = '\\')
 basicSystem$bs <- "Hyperledger Fabric"
@@ -247,7 +247,7 @@ save <- function(titleVar, plot) {
   fileName = tolower(gsub(
     " ",
     "",
-    paste("C:/Users/parallels/Downloads/final-plots/sem-blocks-fabric-single/", titleVar, ".png"),
+    paste("C:/Users/frank/Downloads/final-plots/sem-blocks-fabric-single/", titleVar, ".png"),
     fixed = TRUE
   ))
   ggsave(
@@ -287,10 +287,10 @@ for (valueToUse in valList) {
   }
   
   fNameFullAllSuccessful <-
-    "C:/Users/parallels/Downloads/allblockdataonly"
+    "C:/Users/frank/Downloads/allblockdataonly"
   
   fNameFullAllFailed <-
-    "C:/Users/parallels/Downloads/allfailedx3"
+    "C:/Users/frank/Downloads/allfailedx3"
   
   fileToUseFullAll <-
     read.csv(gsub(" ", "", paste(fNameFullAllSuccessful)), dec = ".")
@@ -399,21 +399,31 @@ for (valueToUse in valList) {
     replace(summariseByMeanAndSd$sd, is.nan(summariseByMeanAndSd$sd) | is.na(summariseByMeanAndSd$sd), 0)
   
   if(valueToUse != "cnt") {
-    divisionByBlocks <- 1
-    if(!is.nan(summariseByMeanAndSd$cnt)
-       && !is.na(summariseByMeanAndSd$cnt)
-       && summariseByMeanAndSd$cnt > 0) {
-      divisionByBlocks <- summariseByMeanAndSd$cnt
-    }
+  #  divisionByBlocks <- 1
+  #  if(!is.nan(summariseByMeanAndSd$cnt)
+  #     && !is.na(summariseByMeanAndSd$cnt)
+  #     && summariseByMeanAndSd$cnt > 0) {
+  #    divisionByBlocks <- summariseByMeanAndSd$cnt
+  #  }
+    
+    summariseByMeanAndSd <- summariseByMeanAndSd %>%
+      mutate(
+        divisionByBlocks = ifelse(
+          !is.nan(cnt) & !is.na(cnt) & cnt > 0,
+          cnt,
+          1
+        )
+      )
+    
   }
   
   if(valueToUse == "sumnof") {
-    summariseByMeanAndSd$mean <- summariseByMeanAndSd$mean / divisionByBlocks
-    summariseByMeanAndSd$sd <- summariseByMeanAndSd$sd / divisionByBlocks
+    summariseByMeanAndSd$mean <- summariseByMeanAndSd$mean / summariseByMeanAndSd$divisionByBlocks
+    summariseByMeanAndSd$sd <- summariseByMeanAndSd$sd / summariseByMeanAndSd$divisionByBlocks
   }
   if(valueToUse == "sumnoa") {
-    summariseByMeanAndSd$mean <- summariseByMeanAndSd$mean / divisionByBlocks
-    summariseByMeanAndSd$sd <- summariseByMeanAndSd$sd / divisionByBlocks
+    summariseByMeanAndSd$mean <- summariseByMeanAndSd$mean / summariseByMeanAndSd$divisionByBlocks
+    summariseByMeanAndSd$sd <- summariseByMeanAndSd$sd / summariseByMeanAndSd$divisionByBlocks
   }
   
   dataListSem = list()

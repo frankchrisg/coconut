@@ -6,3 +6,9 @@
 /wallet*
 /witness-file
 /src/main/java/fabric/chaincode/key_value/go/vendor/
+/src/main/java/solana/contracts/contracts_compiled/
+*.mod
+*.bin
+*.abi
+*.sum
+*.so

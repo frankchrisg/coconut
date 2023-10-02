@@ -28,41 +28,42 @@ loadfonts(device = "win")
 loadfonts(); windowsFonts()
 
 cleanTpl <-
-  function (base_size = 9,
+  function (base_size = 11,
             base_family = "Linux Libertine",
             ...) {
     modifyList (
       theme_minimal (base_size = base_size, base_family = base_family),
       list (axis.line = element_line (colour = "black"))
     ) + theme(
-      legend.title = element_blank(),
+      ###legend.title = element_blank(),
       #legend.title = element_markdown(
       #  colour = "black",#"darkgrey",
       #  size = 9,
       #  face = "bold"
       #),
       legend.title.align = 0.5,
-      legend.position = "none",
+      ###legend.position = "none",
       #legend.position = "bottom",
-      axis.text.y = element_text(size = 9, color = "black", face="bold"),
+      axis.text.y = element_text(size = 14, color = "black", face="bold"),
       #axis.text.y = element_blank(),#element_text(size = 9, color = "black", angle = 90, hjust=0.5),
-      axis.title.y = element_text(size = 9, color = "black", face="bold"),
-      axis.text.x = element_text(size = 9, color = "black"),
-      axis.title.x = element_text(size = 9, color = "black", face="bold"),
+      axis.title.y = element_text(size = 16, color = "black", face="bold"),
+      axis.text.x = element_blank(), ###element_text(size = 11, color = "black"),
+      axis.title.x = element_text(size = 11, color = "black", face="bold"),
       axis.line.x = element_line(color = "grey", size = 0.5),
       plot.caption = element_markdown(
         hjust = 0.9,
         vjust = -0.5,
-        size = 9
+        size = 11
       ),
       legend.key.size = unit(1, "line"),
       legend.spacing.x = unit(0.3, 'cm'),
+      legend.title = element_text(size = 13, color = "black", face="bold"),
       legend.text = element_markdown(
         colour = "black",#"darkgrey",
-        size = 9,
+        size = 11,
         face = "bold"
       ),
-      legend.box.margin = margin(-15, -15, -10, -15),
+      ###legend.box.margin = margin(-15, -15, -10, -15),
     )
   }
 
@@ -72,7 +73,7 @@ save <- function(titleVar, plot, type) {
   fileName = tolower(gsub(
     " ",
     "",
-    paste("C:/Users/parallels/Downloads/final-plots/", titleVar, ".png"),
+    paste("C:/Users/frank/Downloads/final-plots/", titleVar, ".png"),
     fixed = TRUE
   ))
   
@@ -80,7 +81,7 @@ save <- function(titleVar, plot, type) {
     ggsave(
       fileName,
       plot = plot,
-      device = "png",
+      device = "svg",
       path = NULL,
       scale = 1,
       width = 24.00,#20.94, #20
@@ -140,6 +141,9 @@ prepareFiles <- function(fileName, getAll) {
   
   return (fileToUseFullAll)
 }
+
+data_listForEval = list()
+counter <- 0
 
 getPlot <- function(fNameFullAll, paramName) {
   
@@ -206,7 +210,7 @@ getPlot <- function(fNameFullAll, paramName) {
     #                                 , 
     #                                 tps=0.0, avglatency=0.0, duration=0.0)
     # allData <- allData  %>% add_row(fullBenchmarkName = "keyvalue get fabric", bs = "fabric"
-    #                                 , 
+    #                                 , 0,1
     #                                 tps=0.0, avglatency=0.0, duration=0.0)
     allData <- allData  %>% add_row(fullBenchmarkName = "donothing doNothing fabric", bs = "fabric"
                                     , 
@@ -267,55 +271,76 @@ getPlot <- function(fNameFullAll, paramName) {
                                              "Diem",
                                              summariseByMeanTpsAndLatency$bs)
   
-  summariseByMeanTpsAndLatency$bs <- fct_rev(factor(summariseByMeanTpsAndLatency$bs,
-                                                    levels = c(      "Corda OS",
-                                                                     "Corda Enterprise",
-                                                                     "BitShares",
-                                                                     "Fabric",
-                                                                     "Quorum",
-                                                                     "Sawtooth",
-                                                                     "Diem")))
+  summariseByMeanTpsAndLatency$bs <- (factor(summariseByMeanTpsAndLatency$bs,
+                                             levels = c(      "Corda OS",
+                                                              "Corda Enterprise",
+                                                              "BitShares",
+                                                              "Fabric",
+                                                              "Quorum",
+                                                              "Sawtooth",
+                                                              "Diem")))
   
-  summariseByMeanTpsAndLatency$fullBenchmarkName <- fct_rev(factor(summariseByMeanTpsAndLatency$fullBenchmarkName,
-                                                                   levels = c(      "donothing doNothing cordaos",
-                                                                                    "donothing doNothing cordaenterprise",
-                                                                                    "donothing doNothing graphene",
-                                                                                    "donothing doNothing fabric",
-                                                                                    "donothing doNothing quorum",
-                                                                                    "donothing doNothing sawtooth",
-                                                                                    "donothing doNothing diem")))
+  summariseByMeanTpsAndLatency$fullBenchmarkName <- (factor(summariseByMeanTpsAndLatency$fullBenchmarkName,
+                                                            levels = c(      "donothing doNothing cordaos",
+                                                                             "donothing doNothing cordaenterprise",
+                                                                             "donothing doNothing graphene",
+                                                                             "donothing doNothing fabric",
+                                                                             "donothing doNothing quorum",
+                                                                             "donothing doNothing sawtooth",
+                                                                             "donothing doNothing diem")))
   
-  bsScale <- rev(c("Corda OS", "Corda Enterprise", "BitShares", "Fabric", "Quorum", "Sawtooth", "Diem"))
+  bsScale <- (c("Corda\nOS", "Corda\nEnterprise", "BitShares", "Fabric", "Quorum", "Sawtooth", "Diem"))
+  
+  summariseByMeanTpsAndLatency$tps[summariseByMeanTpsAndLatency$tps==0] <- 1
   
   plotScalability<-ggplot(data=summariseByMeanTpsAndLatency, aes(fill=bs, x=fullBenchmarkName, y=get(paramName))) +
-    scale_x_discrete(labels= bsScale) +
-    geom_bar(position = "dodge", stat = "identity", alpha=0.2) +
-    geom_point(position = position_dodge(width = .9), aes(color = bs), shape=8, size=2) + #"\U1F965", size=2) + #"\u25BA", size=2) + 
+    geom_errorbar(
+      aes(ymin = get(paramName), ymax = get(paramName) + get(paste("sd", paramName, sep=""))),
+      width = 1,
+      #      position = position_dodge(0.05),
+      color = "snow4"
+    ) +
     geom_text(
       aes(
-        fontface=2,
-        label = paste(format(round(get(paramName), digits = 2), nsmall = 2), ",\U03C3=", str_trim(sub("NA", "0.00", ifelse(bs=="Corda OS",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2), 
-                                                                                                                           ifelse(bs=="Corda Enterprise",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2),
-                                                                                                                                  ifelse(bs=="BitShares",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2), 
-                                                                                                                                         ifelse(bs=="Fabric",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2),
-                                                                                                                                                ifelse(bs=="Quorum",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2),
-                                                                                                                                                       ifelse(bs=="Sawtooth",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2),
-                                                                                                                                                              ifelse(bs=="Diem",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2), "unknown"))))))) 
-        ), "both")
-        , sep=""),
-        y = as.numeric(format(round(get(paramName), digits = 2), nsmall = 2)) + 0.5
-      ),
-      position = position_dodge(width = .9),
+        label = ifelse(summariseByMeanTpsAndLatency$tps==1,"failed", "")),
+      #position = position_dodge(width = .9),
       #size = 9,
       #family = "Linux Libertine",
       #size = 9,#2.2,
-      hjust = -0.20
+      vjust = -1.00
     ) +
-    xlab("") + ylab("MTPS") +
-    scale_y_continuous(limits = c(0
-                                  , ceiling(max(get(paramName, summariseByMeanTpsAndLatency),na.rm=TRUE) + (
-                                    max(get(paramName, summariseByMeanTpsAndLatency),na.rm=TRUE) / 10
-                                  )))) +
+    
+    #scale_y_log10(limits = c(1, 2000), breaks = c(0.1, 1, 10, 100, 1000)) + #, labels = label_number(), breaks = c(0.1, 1, 10, 100, 1000)) +
+    scale_y_log10(breaks=c(.01, .1, 1, 10, 100, 1000, 1800), limits=c(.01, 1800), labels = label_number()) +
+    scale_x_discrete(labels= bsScale) +
+    geom_bar(position = "dodge", stat = "identity", alpha=.8) +
+    ###geom_point(position = position_dodge(width = .9), aes(color = "black"), shape=c(0,1,2,3,4,5,6), size=2) + #"\U1F965", size=2) + #"\u25BA", size=2) + 
+    geom_point(color="black", shape=c(0,1,2,3,4,5,6), size=5) + #"\U1F965", size=2) + #"\u25BA", size=2) + 
+    #    geom_text(
+    #      aes(
+    #        fontface=2,
+    #        label = paste(format(round(get(paramName), digits = 2), nsmall = 2), ",\U03C3=", str_trim(sub("NA", "0.00", ifelse(bs=="Corda OS",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2), 
+    #                                                                                                                           ifelse(bs=="Corda Enterprise",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2),
+    #                                                                                                                                  ifelse(bs=="BitShares",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2), 
+    #                                                                                                                                         ifelse(bs=="Fabric",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2),
+    #                                                                                                                                                ifelse(bs=="Quorum",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2),
+    #                                                                                                                                                       ifelse(bs=="Sawtooth",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2),
+    #                                                                                                                                                              ifelse(bs=="Diem",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2), "unknown"))))))) 
+  #        ), "both")
+  #        , sep=""),
+  #        y = as.numeric(format(round(get(paramName), digits = 2), nsmall = 2)) + 0.5
+  #      ),
+  #      position = position_dodge(width = .9),
+  #size = 9,
+  #family = "Linux Libertine",
+  #size = 9,#2.2,
+  #      hjust = -0.20
+  #    ) +
+  xlab("") + ylab("MTPS") +
+    #    scale_y_continuous(limits = c(0
+    #                                  , ceiling(max(get(paramName, summariseByMeanTpsAndLatency),na.rm=TRUE) + (
+    #                                    max(get(paramName, summariseByMeanTpsAndLatency),na.rm=TRUE) / 10
+    #                                  )))) +
     theme(
       panel.spacing = unit(0.0, "lines"),
       strip.background = element_blank()#,
@@ -329,7 +354,7 @@ getPlot <- function(fNameFullAll, paramName) {
       ),
       strip.text = element_text(
         color = "black",
-        size = 9,
+        size = 11,
         face = "bold"
       ),
       #plot.margin = unit(c(0, 2, 1, 0), "lines"),
@@ -339,7 +364,7 @@ getPlot <- function(fNameFullAll, paramName) {
       strip.placement = "bottom",
     ) +
     scale_fill_manual(
-      name="Distributed Ledger System",
+      name="Blockchain System",
       labels = c(
         "Corda OS",
         "Corda Enterprise",
@@ -352,7 +377,7 @@ getPlot <- function(fNameFullAll, paramName) {
       values = viridis(140)[seq.int(1L, length(viridis(140)), 20L)]
     ) +
     scale_color_manual(
-      name="Distributed Ledger System",
+      name="Blockchain System",
       labels = c(
         "Corda OS",
         "Corda Enterprise",
@@ -365,40 +390,53 @@ getPlot <- function(fNameFullAll, paramName) {
       values = viridis(140)[seq.int(1L, length(viridis(140)), 20L)]
     ) +
     guides(
-      fill = guide_legend(title.position = "bottom",nrow=1,override.aes = list(size = 2,
-                                                                               shape = c(8,8,8,8,8,8,8),
-                                                                               fill = NA,#rev(viridis(140)[seq.int(1L, length(viridis(140)), 20L)]),
-                                                                               linetype = c(0, 0, 0, 0, 0, 0, 0)
+      fill = guide_legend(title.position = "top",nrow=7,override.aes = list(size = 3,
+                                                                            shape = c(1,0,4,3,5,6,2),
+                                                                            #fill = c(rep("black", 7)),
+                                                                            fill = (viridis(140)[seq.int(1L, length(viridis(140)), 20L)]), #NA,#rev(viridis(140)[seq.int(1L, length(viridis(140)), 20L)]),
+                                                                            linetype = c(0, 0, 0, 0, 0, 0, 0)
       ))
       ,
-      color = guide_legend(title.position = "bottom",override.aes = list(color=rev(viridis(140)[seq.int(1L, length(viridis(140)), 20L)])))) +
-    cleanTpl() +
-    coord_flip()
+      color = guide_legend(title.position = "top",override.aes = list(color=rev(viridis(140)[seq.int(1L, length(viridis(140)), 20L)])))) +
+    cleanTpl() #+
+  #coord_flip()
   
   print("ccccccccccccccccccc")
   print(summariseByMeanTpsAndLatency)
   print("ccccccccccccccccccc")
-    
+  
+  counter <<- counter + 1
+  print(paste("xxx ", counter))
+  data_listForEval[[counter]] <<- summariseByMeanTpsAndLatency
+  
   plotScalability
   return (plotScalability)
 }
 
 plotParam <- "tps" #"avglatency" # "tps"
 fNameFullAll8Peers <-
-  "C:/Users/parallels/Downloads/8peers.csv"
+  "C:/Users/frank/Downloads/8peers.csv"
 peers8 <- getPlot(fNameFullAll8Peers, plotParam)
 fNameFullAll16Peers <-
-  "C:/Users/parallels/Downloads/16peers.csv"
+  "C:/Users/frank/Downloads/16peers.csv"
 peers16 <- getPlot(fNameFullAll16Peers, plotParam)
 fNameFullAll32Peers <-
-  "C:/Users/parallels/Downloads/32peers.csv"
+  "C:/Users/frank/Downloads/32peers.csv"
 peers32 <- getPlot(fNameFullAll32Peers, plotParam)
-p8 <- peers8 + theme(legend.position="none") + labs(caption  = "<span style='color:black'><b><i>8 nodes</i></b></span>")
-p16 <- peers16 + theme(legend.position="none") + labs(caption  = "<span style='color:black'><b><i>16 nodes</i></b></span>")
+p8 <- peers8 + theme(legend.position="none") + labs(caption  = "<span style='font-size:15pt;color:black'><b>8 nodes</b></span>")
+p16 <- peers16 + theme(legend.position="none") + labs(caption  = "<span style='font-size:15pt;color:black'><b>16 nodes</b></span>")
 legend32 <- get_legend(peers32)
-p32 <- peers32 + theme(legend.position="none") + labs(caption  = "<span style='color:black'><b><i>32 nodes</i></b></span>")
+p32 <- peers32 + theme(
+  legend.position = c(1, 1),
+  legend.justification = c("right", "top"),
+  legend.box.background = element_rect(colour = "black")
+) + labs(caption  = "<span style='font-size:15pt;color:black'><b>32 nodes</b></span>")
+#theme(legend.position="none") 
 
 mergedPlot <- cowplot::plot_grid(p8, p16, p32, legend32, rel_heights = c(1,1,1,0.22), ncol=1, nrow=4)
+
+mergedPlot2 <- cowplot::plot_grid(p8, p16, p32, rel_heights = c(1,1,1), ncol=3, nrow=1)
+
 save(paste("scalability-",plotParam,sep=""), mergedPlot, "plot")
 mergedPlot
 
@@ -681,7 +719,7 @@ getHeatmap <- function(fNameFullAll, paramName) {
     ) +
     #  scale_fill_gradient(low = "#77aaff", high = "#3366ff") +
     scale_fill_gradient(low = "#F3F2C9", high = "#f8a288") + #"#FCF7A4", high = "#F57D58") +
-    theme(legend.position = "none") +
+    ###theme(legend.position = "none") +
     scale_x_discrete(labels = paste(levels(summariseByMeanTpsAndLatencyTemp$basicSystemNameOnly))) +
     scale_y_discrete(labels = paste(levels(summariseByMeanTpsAndLatencyTemp$benchmarkNameOnly)), limits = rev(levels(summariseByMeanTpsAndLatencyTemp$benchmarkNameOnly))) +
     ylab(substitute(paste(bold("Benchmark")))) + xlab(substitute(paste(bold("Basic System"))))
@@ -727,13 +765,13 @@ getHeatmap <- function(fNameFullAll, paramName) {
 }
 
 fNameFullAll8PeersHeatmap <-
-  "C:/Users/parallels/Downloads/8peers.csv"
+  "C:/Users/frank/Downloads/8peers.csv"
 peers8Heatmap <- getHeatmap(fNameFullAll8PeersHeatmap)
 fNameFullAll16PeersHeatmap <-
-  "C:/Users/parallels/Downloads/16peers.csv"
+  "C:/Users/frank/Downloads/16peers.csv"
 peers16Heatmap <- getHeatmap(fNameFullAll16PeersHeatmap)
 fNameFullAll32PeersHeatmap <-
-  "C:/Users/parallels/Downloads/32peers.csv"
+  "C:/Users/frank/Downloads/32peers.csv"
 peers32Heatmap <- getHeatmap(fNameFullAll32PeersHeatmap)
 p8Heatmap <- peers8Heatmap + theme(legend.position="none") + labs(caption  = "<span style='color:black'><b><i>8 nodes</i></b></span>")
 p16Heatmap <- peers16Heatmap + theme(legend.position="none") + labs(caption  = "<span style='color:black'><b><i>16 nodes</i></b></span>")
@@ -743,3 +781,222 @@ p32Heatmap <- peers32Heatmap + theme(legend.position="none") + labs(caption  = "
 save("peers8heatmap", p8Heatmap, "heatmap")
 save("peers16heatmap", p16Heatmap, "heatmap")
 save("peers32heatmap", p32Heatmap, "heatmap")
+
+mergedPlot2
+
+peers = c(rep(8,7))
+data_listForEval[[1]] <- cbind(data_listForEval[[1]], peers=peers)
+peers = c(rep(16,7))
+data_listForEval[[2]] <- cbind(data_listForEval[[2]], peers=peers)
+peers = c(rep(32,7))
+data_listForEval[[3]] <- cbind(data_listForEval[[3]], peers=peers)
+mergedData <- rbind(data_listForEval[[1]], data_listForEval[[2]], data_listForEval[[3]])
+mergedData <- rbind(mergedData, mergedFrame)
+
+cleanTpl2 <-
+  function (base_size = 11,
+            base_family = "Linux Libertine",
+            ...) {
+    modifyList (
+      theme_minimal (base_size = base_size, base_family = base_family),
+      list (axis.line = element_line (colour = "black"))
+    ) + theme(
+      ###legend.title = element_blank(),
+      #legend.title = element_markdown(
+      #  colour = "black",#"darkgrey",
+      #  size = 9,
+      #  face = "bold"
+      #),
+      #legend.title.align = 0.5,
+      legend.position = "none",
+      #legend.position = "bottom",
+      axis.text.y = element_text(size = 14, color = "black", face="bold"),
+      #axis.text.y = element_blank(),#element_text(size = 9, color = "black", angle = 90, hjust=0.5),
+      axis.title.y = element_text(size = 16, color = "black", face="bold"),
+      axis.text.x = element_text(size = 14, color = "black", face="bold"),
+      axis.title.x = element_text(size = 16, color = "black", face="bold", vjust = -0.4),
+      ###axis.line.x = element_line(color = "grey", size = 0.5),
+      plot.caption = element_markdown(
+        hjust = 0.9,
+        vjust = -0.5,
+        size = 11
+      ),
+      legend.key.size = unit(1, "line"),
+      legend.spacing.x = unit(0.3, 'cm'),
+      legend.title = element_text(size = 13, color = "black", face="bold"),
+      legend.text = element_markdown(
+        colour = "black",#"darkgrey",
+        size = 11,
+        face = "bold"
+      ),
+      strip.background = element_rect(
+        color = "black",
+        size = 0,
+        fill = "grey92"
+      ),
+      strip.text = element_text(
+        color = "black",
+        size = 11,
+        face = "bold"
+      )
+      ###legend.box.margin = margin(-15, -15, -10, -15),
+    )
+  }
+
+peerScale <- (c("4", "8", "16", "32"))
+mergedData <- transform(mergedData, peers = as.character(peers))
+mergedData$tps[mergedData$tps==0] <- 1
+mergedData$sdtps[mergedData$bs=="Corda OS" & mergedData$peers==4] <- 0.04334429
+mergedData$sdtps[mergedData$bs=="Corda Enterprise" & mergedData$peers==4] <- 0.15053027
+mergedData$sdtps[mergedData$bs=="BitShares" & mergedData$peers==4] <- 0.1892952
+mergedData$sdtps[mergedData$bs=="Fabric" & mergedData$peers==4] <- 61.200594652
+mergedData$sdtps[mergedData$bs=="Quorum" & mergedData$peers==4] <- 12.1315489
+mergedData$sdtps[mergedData$bs=="Sawtooth" & mergedData$peers==4] <- 1.6432004
+mergedData$sdtps[mergedData$bs=="Diem" & mergedData$peers==4] <- 2.1052348
+plotScalabilityLog<-
+  ggplot(data=mergedData, aes(fill=bs, x=peers, y=tps)) +
+  geom_errorbar(
+    aes(ymin = tps, ymax = tps + sdtps),
+    #aes(ymin = get(paramName), ymax = get(paramName) + get(paste("sd", paramName, sep=""))),
+    width = 1,
+          position = position_dodge(0.05),
+    color = "snow4"
+  ) +
+  geom_label(
+    aes(
+      label=ifelse(tps==1,paste("Failed", sep=""), NA)),
+    #position = position_dodge(width = .9),
+    color="white",
+    size = 3.3,
+    #nudge_y = .2,
+    #label.padding = unit(1, "lines"),
+    alpha=.8,
+    family = "Linux Libertine",
+    fontface = "bold"#,
+    #size = 9,#2.2,
+    #vjust = -1.00
+  ) +
+  scale_y_log10(breaks=c(.06, .1, 1, 10, 50, 100, 200, 400, 800, 1600), limits=c(.06, 1700), labels = label_number()) +
+  geom_bar(position = "dodge", stat = "identity", alpha=.8) +
+    facet_wrap(
+      ~ bs,
+      strip.position = "bottom",
+      scales = "free_x",
+      nrow = 1
+    ) +
+    scale_x_discrete(labels=peerScale, limits=peerScale) +
+    
+  ###geom_point(position = position_dodge(width = .9), aes(color = "black"), shape=c(0,1,2,3,4,5,6), size=2) + #"\U1F965", size=2) + #"\u25BA", size=2) + 
+  ###geom_point(color="black", shape=c(0,1,2,3,4,5,6), size=5) + #"\U1F965", size=2) + #"\u25BA", size=2) + 
+  #    geom_text(
+  #      aes(
+  #        fontface=2,
+  #        label = paste(format(round(get(paramName), digits = 2), nsmall = 2), ",\U03C3=", str_trim(sub("NA", "0.00", ifelse(bs=="Corda OS",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2), 
+  #                                                                                                                           ifelse(bs=="Corda Enterprise",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2),
+  #                                                                                                                                  ifelse(bs=="BitShares",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2), 
+  #                                                                                                                                         ifelse(bs=="Fabric",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2),
+  #                                                                                                                                                ifelse(bs=="Quorum",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2),
+  #                                                                                                                                                       ifelse(bs=="Sawtooth",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2),
+  #                                                                                                                                                              ifelse(bs=="Diem",format(round(get(paste("sd", paramName, sep="")), digits = 2), nsmall = 2), "unknown"))))))) 
+  #        ), "both")
+#        , sep=""),
+#        y = as.numeric(format(round(get(paramName), digits = 2), nsmall = 2)) + 0.5
+#      ),
+#      position = position_dodge(width = .9),
+#size = 9,
+#family = "Linux Libertine",
+#size = 9,#2.2,
+#      hjust = -0.20
+#    ) +
+xlab("Peers grouped by blockchain systems") + ylab("MTPS") +
+  #    scale_y_continuous(limits = c(0
+  #                                  , ceiling(max(get(paramName, summariseByMeanTpsAndLatency),na.rm=TRUE) + (
+  #                                    max(get(paramName, summariseByMeanTpsAndLatency),na.rm=TRUE) / 10
+  #                                  )))) +
+  theme(
+    strip.background = element_rect(
+      color = "black",
+      size = 0,
+      fill = "grey92"
+    ),
+    strip.text = element_text(
+      color = "black",
+      size = 11,
+      face = "bold"
+    ),
+    #plot.margin = unit(c(0, 2, 1, 0), "lines"),
+    plot.margin = unit(c(0, 1, 1, 0), "lines"),
+    #plot.margin = unit(c(0, 0, 1, 0), "lines"),
+    #plot.margin = unit(c(1, 1, 1, 1), "lines"),      
+    strip.placement = "bottom",
+  ) +
+    
+  #scale_fill_manual(
+  #  labels = c("4",
+  #  "8",
+  #  "16",
+  #  "32"
+  #  ),
+  #  values = viridis(140)[seq.int(1L, length(viridis(140)), 35L)]
+  #) +
+  
+  scale_fill_manual(
+  labels = c("Corda OS",
+  "Corda Enterprise",
+  "BitShares",
+  "Fabric",
+  "Quorum",
+  "Sawtoot",
+  "Diem"
+  ),
+  values = viridis(140)[seq.int(1L, length(viridis(140)), 20L)]
+) +
+  geom_text(aes(y = tps + sdtps, 
+                label = ifelse(sdtps != 0, paste0("\u03C3=", str_trim(format(round(sdtps, digits = 2), nsmall = 2, big.mark = ""))), NA),
+                vjust = ifelse(tps > 0.1, -0.5, 1.5)), 
+            fontface = "bold",
+            size = 3.1) +
+  
+#  scale_color_manual(
+#    name="Blockchain System",
+#    labels = c(
+#      "Corda OS",
+#      "Corda Enterprise",
+#      "BitShares",
+#      "Fabric",
+#      "Quorum",
+#      "Sawtooth",
+#      "Diem"
+#    ),
+#    values = viridis(140)[seq.int(1L, length(viridis(140)), 20L)]
+#  ) +
+#  guides(
+#    fill = guide_legend(title.position = "top",nrow=7,override.aes = list(size = 3,
+#                                                                          shape = c(1,0,4,3,5,6,2),
+#                                                                          #fill = c(rep("black", 7)),
+#                                                                          fill = (viridis(140)[seq.int(1L, length(viridis(140)), 20L)]), #NA,#rev(viridis(140)[seq.int(1L, length(viridis(140)), 20L)]),
+#                                                                          linetype = c(0, 0, 0, 0, 0, 0, 0)
+#    ))
+#    ,
+#    color = guide_legend(title.position = "top",override.aes = list(color=rev(viridis(140)[seq.int(1L, length(viridis(140)), 20L)])))) +
+  cleanTpl2() 
+  
+plotScalabilityLog
+
+ggsave(
+  "C:/Users/frank/Downloads/xxxxxxxxxxxxxxxxxx.svg",
+  plot = plotScalabilityLog,
+  device = "svg",
+  #path = NULL,
+  #scale = 1,
+  width = 38.00,#20.94, #20
+  #NA,
+  height = 18,
+  #NA,
+  units = c("cm"),
+  #"in"),
+  dpi = 320,
+  #320,
+  limitsize = TRUE,
+  bg = "white"
+)

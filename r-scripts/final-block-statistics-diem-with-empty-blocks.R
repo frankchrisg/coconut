@@ -107,7 +107,7 @@ save <- function(titleVar, plot) {
   fileName = tolower(gsub(
     " ",
     "",
-    paste("C:/Users/parallels/Downloads/final-plots/blockdata/", titleVar, ".png"),
+    paste("C:/Users/frank/Downloads/final-plots/blockdata/", titleVar, ".png"),
     fixed = TRUE
   ))
   ggsave(
@@ -129,8 +129,8 @@ save <- function(titleVar, plot) {
   )
 }
 
-fNameAllBlocks <- "C:/Users/parallels/Downloads/allblockdataonly-diemonly"
-fNameAllBlocksFailed <- "C:/Users/parallels/Downloads/allfailedx3-diemonly"
+fNameAllBlocks <- "C:/Users/frank/Downloads/allblockdataonly-diemonly"
+fNameAllBlocksFailed <- "C:/Users/frank/Downloads/allfailedx3-diemonly"
 
 allBlocks <- prepareFiles(fNameAllBlocks)
 failedBlocks <- prepareFiles(fNameAllBlocksFailed)
@@ -160,8 +160,8 @@ generalGroup <-
 
 #####
 
-fNameAllBlocksCid <- "C:/Users/parallels/Downloads/allblockdataonly-diemonly"
-fNameAllBlocksFailedCid <- "C:/Users/parallels/Downloads/allfailedx3-diemonly"
+fNameAllBlocksCid <- "C:/Users/frank/Downloads/allblockdataonly-diemonly"
+fNameAllBlocksFailedCid <- "C:/Users/frank/Downloads/allfailedx3-diemonly"
 
 allBlocksCid <- prepareFilesWithoutRepidReplacement(fNameAllBlocksCid)
 failedBlocksCid <- prepareFiles(fNameAllBlocksFailedCid)
@@ -456,3 +456,49 @@ for (benchmark in benchmarkList) {
   
 }
 blockPlot
+
+# newTables ---------------------------------------------------------------
+
+longFormatBak <- longFormat
+longFormatBak$RL <- apply(longFormatBak, 1, function(x) gsub("RL=", " ", x[["RL"]], fixed = TRUE))
+longFormatBak <- longFormatBak[order(longFormatBak$RL,decreasing=TRUE),]
+longFormatBak <- longFormatBak[order(longFormatBak$Category,decreasing=FALSE),]
+
+longFormatBak$variable <- str_replace(longFormatBak$variable, "mact$", "Mean actions per block")
+longFormatBak <- longFormatBak[!(longFormatBak$variable=="Mean actions per block"),]
+
+longFormatBak <- longFormatBak[,-3:-7]
+longFormatBak$variable <- str_replace(longFormatBak$variable, "countVarMean$", "Mean number of blocks")
+longFormatBak$variable <- str_replace(longFormatBak$variable, "countVarMeanEmpty$", "Mean number of empty blocks")
+longFormatBak$variable <- str_replace(longFormatBak$variable, "mtxs$", "Mean transactions per block")
+longFormatBak$variable <- str_replace(longFormatBak$variable, "mblocks$", "Mean number of blocks by datapoint")
+
+longFormatBak$value <- round(longFormatBak$value, digits = 2)
+longFormatBak$Category <- apply(longFormatBak, 1, function(x) gsub("BI=|BP=|BS=|MM=|PD=", " ", x[["Category"]], fixed = FALSE))
+names(longFormatLatencyBak)[names(longFormatLatencyBak) == 'variable'] <- 'Variable'
+names(longFormatLatencyBak)[names(longFormatLatencyBak) == 'value'] <- 'Value'
+
+makeTbl <- function(tbl, cpt, aln1, aln2) {
+  xt <-
+    xtable(
+      tbl,
+      digits = 2,
+      align = aln1,
+      caption = cpt,
+      sanitize.text.function = identity
+    )
+  
+  #digits(xt) <- 4
+  align(xt) <- xalign(xt)
+  #digits(xt) <- xdigits(xt)
+  display(xt) <- xdisplay(xt)
+  
+  print(
+    xtable(xt, align = aln2, caption = cpt),
+    #"Sawtooth"),
+    include.rownames = FALSE,
+    sanitize.text.function = identity
+  )
+}
+
+makeTbl(longFormatBak, "x", "ccccc", "ccc|cc")

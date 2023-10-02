@@ -16,6 +16,12 @@
             </snapshots>
             <url>file:///${basedir}/libs</url>
         </repository>
+
+           <!--<repository>
+                <id>jitpack.io</id>
+                <url>https://jitpack.io</url>
+            </repository>-->
+
     </repositories>
 
     <groupId>org.example</groupId>
@@ -23,6 +29,16 @@
     <version>1.0-SNAPSHOT</version>
     <build>
         <plugins>
+
+            <!-- java 17 -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <mainClass>client.executors.MainExecutor</mainClass>
+                </configuration>
+            </plugin>
 
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
@@ -151,6 +167,41 @@
                             <repositoryLayout>default</repositoryLayout>
                             <groupId>gid</groupId>
                             <artifactId>fabric</artifactId>
+                            <version>0.1</version>
+                            <packaging>jar</packaging>
+                            <generatePom>true</generatePom>
+                        </configuration>
+                    </execution>
+
+                    <execution>
+                        <id>install-borsh</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>install-file</goal>
+                        </goals>
+                        <configuration>
+                            <file>${basedir}/libs/gid/borsh/0.1/borshj-0.0.0.jar</file>
+                            <repositoryLayout>default</repositoryLayout>
+                            <groupId>gid</groupId>
+                            <artifactId>borsh</artifactId>
+                            <version>0.1</version>
+                            <packaging>jar</packaging>
+                            <generatePom>true</generatePom>
+                        </configuration>
+                    </execution>
+
+                    <execution>
+                        <id>install-solana</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>install-file</goal>
+                        </goals>
+                        <configuration>
+                            <!--<file>${basedir}/libs/gid/solana/0.1/solana-sdk-java-1.14.jar</file>-->
+                            <file>${basedir}/libs/gid/solana/0.1/solanaj-0.0.7-jar-with-dependencies.jar</file>
+                            <repositoryLayout>default</repositoryLayout>
+                            <groupId>gid</groupId>
+                            <artifactId>solana</artifactId>
                             <version>0.1</version>
                             <packaging>jar</packaging>
                             <generatePom>true</generatePom>
@@ -546,8 +597,8 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <source>8</source>
-                    <target>8</target>
+                    <source>11</source>
+                    <target>11</target>
                 </configuration>
                 <version>3.8.1</version>
             </plugin>
@@ -590,6 +641,24 @@
             <groupId>gid</groupId>
             <artifactId>fabric</artifactId>
             <version>0.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>gid</groupId>
+            <artifactId>borsh</artifactId>
+            <version>0.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>gid</groupId>
+            <artifactId>solana</artifactId>
+            <version>0.1</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -943,6 +1012,41 @@
             <artifactId>jcabi-aspects</artifactId>
             <version>0.23.2</version>
         </dependency>
+
+        <!--<dependency>
+            <groupId>com.mmorrell</groupId>
+            <artifactId>solanaj</artifactId>
+            <version>1.14</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.bitcoinj</groupId>
+                    <artifactId>core.ECKey</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>-->
+
+        <!-- java 17 -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>17</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>17</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.syntifi.near</groupId>
+            <artifactId>borshj</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+
 
     </dependencies>
 

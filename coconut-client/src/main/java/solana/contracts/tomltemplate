@@ -1,0 +1,13 @@
+[package]
+name = "placeholder_name"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+borsh = "0.9.1"
+#solana-program = { version = "1.10", features = ["bpf_c"] }
+solana-program = "1.10"
+#solana-sdk = "1.10"
+
+[lib]
+crate-type = ["cdylib", "rlib"]

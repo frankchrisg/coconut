@@ -1,4 +1,5 @@
 library(lubridate)
+#devtools::install_version("ggplot2", version = "3.3.0")
 library(ggplot2)
 library(plotly)
 library(reshape2)
@@ -11,6 +12,7 @@ library(hash)
 library(dplyr)
 library(tibble)
 library(viridis)
+#devtools::install_version("", version = "0.0.8")
 library(ggtext)
 library(ggrepel)
 library(data.table)
@@ -116,7 +118,7 @@ save <- function(titleVar, plot, path) {
   fileName = tolower(gsub(
     " ",
     "",
-    paste("C:/Users/parallels/Downloads/final-plots/fabric/",path,"/", titleVar, ".png"),
+    paste("C:/Users/frank/Downloads/final-plots/fabric/",path,"/", titleVar, ".png"),
     fixed = TRUE
   ))
   ggsave(
@@ -140,12 +142,12 @@ save <- function(titleVar, plot, path) {
 
 # Create data by program
 fNameFullAll <-
-  "C:/Users/parallels/Downloads/testwr-fabric" #fabric
+  "C:/Users/frank/Downloads/testwr-fabric" #fabric
 
 tpsAndLatencyData <- prepareFiles(fNameFullAll)
 
 fNameFullAllRep <-
-  "C:/Users/parallels/Downloads/failed1query-rid-data-1657910318868.csv" #fabric
+  "C:/Users/frank/Downloads/failed1query-rid-data-1657910318868.csv" #fabric
 tpsAndLatencyDataRep <- prepareFiles(fNameFullAllRep)
 tpsAndLatencyDataRep <- tpsAndLatencyDataRep[tpsAndLatencyDataRep$run_id != "4000000-fabricConfiguration-sb-createAccount-40-flalv-rn-1-hetzner-repid-0-fabric-rl-100-mm-2000",]
 tpsAndLatencyDataRep <- tpsAndLatencyDataRep[tpsAndLatencyDataRep$run_id != "4000000-fabricConfiguration-sb-sendPayment-40-flalv-rn-1-hetzner-repid-0-fabric-rl-100-mm-2000",]
@@ -178,11 +180,19 @@ generalGroup <-
 
 summariseByMeanTpsAndLatency <-
   generalGroup %>% summarise(
+    n = n(),  # Count number of samples
     sdtps = sd(tps, na.rm = TRUE),
     sdavglatency = sd(avglatency, na.rm = TRUE),
     tps = mean(tps, na.rm = TRUE),
     avglatency = mean(avglatency, na.rm = TRUE),
     duration = mean(duration, na.rm = TRUE),
+    semtps = sdtps / sqrt(n),
+    semavglatency = sdavglatency / sqrt(n),
+    # Use qt() for the t-distribution quantile function. Use df = n - 1
+    CI_low_tps = tps - qt(0.975, df = n-1) * semtps,
+    CI_high_tps = tps + qt(0.975, df = n-1) * semtps,
+    CI_low_avglatency = avglatency - qt(0.975, df = n-1) * semavglatency,
+    CI_high_avglatency = avglatency + qt(0.975, df = n-1) * semavglatency,
     .groups = "keep"
   ) %>% arrange(match(cutCriteria, c("100", "500", "1000", "2000")), match(rl, c("50", "100", "200", "400")))#, desc(rl), desc(tps))
 
@@ -200,6 +210,49 @@ summariseByMeanTpsAndLatency$avglatency <-
       is.na(summariseByMeanTpsAndLatency$avglatency),
     0
   )
+
+# Replace NA or NaN with 0 for semtps
+summariseByMeanTpsAndLatency$semtps <- replace(
+  summariseByMeanTpsAndLatency$semtps,
+  is.nan(summariseByMeanTpsAndLatency$semtps) |
+    is.na(summariseByMeanTpsAndLatency$semtps),
+  0
+)
+# Replace NA or NaN with 0 for CI_low_tps
+summariseByMeanTpsAndLatency$CI_low_tps <- replace(
+  summariseByMeanTpsAndLatency$CI_low_tps,
+  is.nan(summariseByMeanTpsAndLatency$CI_low_tps) |
+    is.na(summariseByMeanTpsAndLatency$CI_low_tps),
+  0
+)
+# Replace NA or NaN with 0 for CI_high_tps
+summariseByMeanTpsAndLatency$CI_high_tps <- replace(
+  summariseByMeanTpsAndLatency$CI_high_tps,
+  is.nan(summariseByMeanTpsAndLatency$CI_high_tps) |
+    is.na(summariseByMeanTpsAndLatency$CI_high_tps),
+  0
+)
+# Replace NA or NaN with 0 for semavglatency
+summariseByMeanTpsAndLatency$semavglatency <- replace(
+  summariseByMeanTpsAndLatency$semavglatency,
+  is.nan(summariseByMeanTpsAndLatency$semavglatency) |
+    is.na(summariseByMeanTpsAndLatency$semavglatency),
+  0
+)
+# Replace NA or NaN with 0 for CI_low_avglatency
+summariseByMeanTpsAndLatency$CI_low_avglatency <- replace(
+  summariseByMeanTpsAndLatency$CI_low_avglatency,
+  is.nan(summariseByMeanTpsAndLatency$CI_low_avglatency) |
+    is.na(summariseByMeanTpsAndLatency$CI_low_avglatency),
+  0
+)
+# Replace NA or NaN with 0 for CI_high_avglatency
+summariseByMeanTpsAndLatency$CI_high_avglatency <- replace(
+  summariseByMeanTpsAndLatency$CI_high_avglatency,
+  is.nan(summariseByMeanTpsAndLatency$CI_high_avglatency) |
+    is.na(summariseByMeanTpsAndLatency$CI_high_avglatency),
+  0
+)
 
 summariseByMeanTpsAndLatency$duration <-
   replace(
@@ -279,8 +332,16 @@ for (benchmark in benchmarkList) {
         rep("MM=2000", 4)
       ),
       "SDTPS" = summariseByMeanTpsAndLatency$sdtps[which(summariseByMeanTpsAndLatency$fullBenchmarkName ==
-                                                           tempName)]
+                                                           tempName)],
+      "SEMTPS" = summariseByMeanTpsAndLatency$semtps[which(summariseByMeanTpsAndLatency$fullBenchmarkName ==
+                                                             tempName)],
+      "CI_low_tps" = summariseByMeanTpsAndLatency$CI_low_tps[which(summariseByMeanTpsAndLatency$fullBenchmarkName ==
+                                                                     tempName)],
+      "CI_high_tps" = summariseByMeanTpsAndLatency$CI_high_tps[which(summariseByMeanTpsAndLatency$fullBenchmarkName ==
+                                                                       tempName)]
     )
+  
+  print(preparedDataFrameTps)
   
   preparedDataFrameTps <- subset(preparedDataFrameTps, Category != "MM=500" & Category != "MM=1000" & Category != "MM=2000")
   preparedDataFrameTps <- subset(preparedDataFrameTps, RL != "RL=200" & RL != "RL=400")
@@ -291,7 +352,7 @@ for (benchmark in benchmarkList) {
   longFormatTps <-
     melt(
       setDT(preparedDataFrameTps),
-      id.vars = c("RL", "Category", "SDTPS"),
+      id.vars = c("RL", "Category", "SDTPS", "SEMTPS", "CI_low_tps", "CI_high_tps"),
       variable.name = "BenchmarkName"
     )
   longFormatTps$BenchmarkName <-
@@ -307,7 +368,8 @@ for (benchmark in benchmarkList) {
            levels = c("MM=100", "MM=500", "MM=1000", "MM=2000"))
   
   aggDataMaxTps <-
-    aggregate(formula = value ~ BenchmarkName,
+    aggregate(x = value ~ BenchmarkName,
+              #x = value ~ BenchmarkName,
               FUN = max,
               data = longFormatTps)
   
@@ -352,7 +414,13 @@ for (benchmark in benchmarkList) {
         rep("MM=2000", 4)
       ),
       "SDLATENCY" = summariseByMeanTpsAndLatency$sdavglatency[which(summariseByMeanTpsAndLatency$fullBenchmarkName ==
-                                                                      tempName)]
+                                                                      tempName)],
+      "SEMLATENCY" = summariseByMeanTpsAndLatency$semavglatency[which(summariseByMeanTpsAndLatency$fullBenchmarkName ==
+                                                                        tempName)],
+      "CI_low_latency" = summariseByMeanTpsAndLatency$CI_low_avglatency[which(summariseByMeanTpsAndLatency$fullBenchmarkName ==
+                                                                                tempName)],
+      "CI_high_latency" = summariseByMeanTpsAndLatency$CI_high_avglatency[which(summariseByMeanTpsAndLatency$fullBenchmarkName ==
+                                                                                  tempName)]
     )
   
   preparedDataFrameLatency <- subset(preparedDataFrameLatency, Category != "MM=500" & Category != "MM=1000" & Category != "MM=2000")
@@ -364,7 +432,7 @@ for (benchmark in benchmarkList) {
   longFormatLatency <-
     melt(
       setDT(preparedDataFrameLatency),
-      id.vars = c("RL", "Category", "SDLATENCY"),
+      id.vars = c("RL", "Category", "SDLATENCY", "SEMLATENCY", "CI_low_latency", "CI_high_latency"),
       variable.name = "BenchmarkName"
     )
   longFormatLatency$BenchmarkName <-
@@ -381,7 +449,8 @@ for (benchmark in benchmarkList) {
   
   aggDataMinLatency <-
     aggregate(
-      formula = value ~ BenchmarkName,
+      x = value ~ BenchmarkName,
+      #x = value ~ BenchmarkName,
       FUN = min,
       data = longFormatLatency,
       subset = value > 0
@@ -429,6 +498,13 @@ for (benchmark in benchmarkList) {
     generalGroup %>% summarise(#%>% filter( countallrows > 0 ) %>% summarise(
       mrows = mean(countallrows, na.rm = TRUE),
       sdmrows = sd(countallrows, na.rm = TRUE),
+      # Calculate number of rows (sample size)
+      n = n(),
+      # Calculate SEM
+      semmrows = sdmrows / sqrt(n),
+      # Calculate lower and upper bounds of the confidence interval
+      CI_low_mrows = mrows - qt(0.975, df = n-1) * semmrows,
+      CI_high_mrows = mrows + qt(0.975, df = n-1) * semmrows,
       .groups = "keep") %>% arrange(match(cutCriteria, c("100", "500", "1000", "2000")), match(rl, c("50", "100", "200", "400")))
   summariseAllMeanData$mrows <-
     replace(
@@ -503,6 +579,17 @@ for (benchmark in benchmarkList) {
     summariseAllMeanData$offset[which(summariseAllMeanData$fullBenchmarkName ==
                                         tempName)]
   
+  longFormatAllDataRows$semmrows <-
+    summariseAllMeanData$semmrows[which(summariseAllMeanData$fullBenchmarkName ==
+                                          tempName)]
+  longFormatAllDataRows$CI_low_mrows <-
+    summariseAllMeanData$CI_low_mrows[which(summariseAllMeanData$fullBenchmarkName ==
+                                              tempName)]
+  
+  longFormatAllDataRows$CI_high_mrows <-
+    summariseAllMeanData$CI_high_mrows[which(summariseAllMeanData$fullBenchmarkName ==
+                                               tempName)]
+  
   longFormatAllDataRows <- subset(longFormatAllDataRows, Category != "MM=500" & Category != "MM=1000" & Category != "MM=2000")
   longFormatAllDataRows <- subset(longFormatAllDataRows, RL != "RL=200" & RL != "RL=400")
   
@@ -515,8 +602,8 @@ for (benchmark in benchmarkList) {
   
   # plotAllDataRows -------------------------------------------------------------------
   
-  mrowsOnlyVal <- subset(mrowsTemp, select = -c(value, expected, failed, offset, sdmrows))
-  failedOnlyVal <- subset(failedTemp, select = -c(value, expected, mrows, offset, sdmrows))
+  mrowsOnlyVal <- subset(mrowsTemp, select = -c(value, expected, failed, offset, sdmrows, semmrows, CI_low_mrows, CI_high_mrows))
+  failedOnlyVal <- subset(failedTemp, select = -c(value, expected, mrows, offset, sdmrows, semmrows, CI_low_mrows, CI_high_mrows))
   colnames(mrowsOnlyVal)[4] <- "barplotVal"
   colnames(failedOnlyVal)[4] <- "barplotVal"
   colnames(mrowsOnlyVal)[5] <- "status"
@@ -547,7 +634,7 @@ for (benchmark in benchmarkList) {
                  color = m),
              size = 3) +
     geom_bar(data = fullBarPlotVals, aes(x = RL, y = value, fill=status),alpha=0.2,position = "stack",stat="identity", show.legend = FALSE) +    
-#    geom_bar(data = fullBarPlotVals, aes(x = RL, y = value, fill=status),alpha=0.2,position = position_dodge(width = 0),stat="identity", show.legend = FALSE) +    
+    #    geom_bar(data = fullBarPlotVals, aes(x = RL, y = value, fill=status),alpha=0.2,position = position_dodge(width = 0),stat="identity", show.legend = FALSE) +    
     #geom_line(data = failedTemp,
     #          aes(x = RL, y = failed, group = 1),
     #          color = "#482677FF") +
@@ -848,11 +935,11 @@ for (benchmark in benchmarkList) {
              order = 1,
              nrow = 1,
              override.aes = list(
-               size = 2,
+               size = 2#,
                #            color = c("black", "red", "green", "blue"),
-               color = c("#95D840FF", "#20A387FF", "#482677FF", "black"),
+               #               color = c("#95D840FF", "#20A387FF", "#482677FF", "black"),
                #shape = c(16, 16, 15, NA)
-               shape = c(15, 17, 18, NA)#(16, 16, 15, NA)
+               #               shape = c(15, 17, 18, NA)#(16, 16, 15, NA)
              )
            )) #+
   #labs(caption = paste("<span style='color:black'><b>", tempName, "</b></span>"))
@@ -887,7 +974,7 @@ getByHighlight <-
     x[x$highlight == "highlight"])))
 
 getByHighlight <-
-  subset(getByHighlight, select = -c(normaltag, highlight, SDTPS))
+  subset(getByHighlight, select = -c(normaltag, highlight, SDTPS, SEMTPS, CI_low_tps, CI_high_tps))
 
 colnames(getByHighlight)[2] <- "MM"
 colnames(getByHighlight)[4] <- "Max TPS"
@@ -966,7 +1053,7 @@ xt <-
 #digits(xt) <- 4
 align(xt) <- xalign(xt)
 #digits(xt) <- xdigits(xt)
-display(xt) <- xdisplay(xt)
+#display(xt) <- xdisplay(xt)
 
 print(
   xtable(xt, align = "l|cc|cccc", caption = "Hyperledger Fabric"),
@@ -1036,3 +1123,169 @@ print(
   sanitize.text.function = identity,
   type = 'latex'
 )
+
+# newTables ---------------------------------------------------------------
+
+# longFormatLatencyBak <- datalistLatency[[1]] #longFormatLatency
+# longFormatLatencyBak$RL <- apply(longFormatLatencyBak, 1, function(x) gsub("RL=", " ", x[["RL"]], fixed = TRUE))
+# longFormatLatencyBak$SDLATENCY <- round(longFormatLatencyBak$SDLATENCY, digits = 2)
+# longFormatLatencyBak$value <- round(longFormatLatencyBak$value, digits = 2)
+# longFormatLatencyBak <- longFormatLatencyBak[,-6:-7]
+# longFormatLatencyBak <- longFormatLatencyBak[,-4]
+# longFormatLatencyBak <- longFormatLatencyBak[,c(1,2,4,3)]
+# names(longFormatLatencyBak)[names(longFormatLatencyBak) == 'value'] <- 'MFLS'
+# names(longFormatLatencyBak)[names(longFormatLatencyBak) == 'SDLATENCY'] <- 'SD'
+# 
+# longFormatTpsBak <- datalistTps[[1]] #longFormatTps
+# longFormatTpsBak$RL <- apply(longFormatTpsBak, 1, function(x) gsub("RL=", " ", x[["RL"]], fixed = TRUE))
+# longFormatTpsBak$SDTPS <- round(longFormatTps$SDTPS, digits = 2)
+# longFormatTpsBak$value <- round(longFormatTpsBak$value, digits = 2)
+# longFormatTpsBak <- longFormatTpsBak[,-6:-7]
+# longFormatTpsBak <- longFormatTpsBak[,-4]
+# longFormatTpsBak <- longFormatTpsBak[,c(1,2,4,3)]
+# names(longFormatTpsBak)[names(longFormatTpsBak) == 'value'] <- 'MTPS'
+# names(longFormatTpsBak)[names(longFormatTpsBak) == 'SDTPS'] <- 'SD'
+# 
+# longFormatAllDataRowsBak <- datalistFailures[[1]] #longFormatAllDataRows
+# longFormatAllDataRowsBak$RL <- apply(longFormatAllDataRowsBak, 1, function(x) gsub("RL=", " ", x[["RL"]], fixed = TRUE))
+# longFormatAllDataRowsBak <- longFormatAllDataRowsBak[,-3]
+# longFormatAllDataRowsBak <- longFormatAllDataRowsBak[,-5]
+# longFormatAllDataRowsBak <- longFormatAllDataRowsBak[,-6:-7]
+# longFormatAllDataRowsBak$sdmrows <- round(longFormatAllDataRowsBak$sdmrows, digits = 2)
+# longFormatAllDataRowsBak$value <- round(longFormatAllDataRowsBak$value, digits = 2)
+# longFormatAllDataRowsBak <- longFormatAllDataRowsBak[,c(1,2,3,5,4)]
+# names(longFormatAllDataRowsBak)[names(longFormatAllDataRowsBak) == 'value'] <- 'Received NoT'
+# names(longFormatAllDataRowsBak)[names(longFormatAllDataRowsBak) == 'sdmrows'] <- 'SD'
+# names(longFormatAllDataRowsBak)[names(longFormatAllDataRowsBak) == 'expected'] <- 'Expected NoT'
+
+longFormatLatencyBak <- datalistLatency[[5]] #longFormatLatency
+longFormatLatencyBak$RL <- apply(longFormatLatencyBak, 1, function(x) gsub("RL=", " ", x[["RL"]], fixed = TRUE))
+longFormatLatencyBak$SDLATENCY <- round(longFormatLatencyBak$SDLATENCY, digits = 2)
+longFormatLatencyBak$value <- round(longFormatLatencyBak$value, digits = 2)
+longFormatLatencyBak$SEMLATENCY <- round(longFormatLatencyBak$SEMLATENCY, digits = 2)
+longFormatLatencyBak$pm_value <- longFormatLatencyBak$CI_high_latency - longFormatLatencyBak$value
+longFormatLatencyBak$pm_value <- paste("$\\pm$",round(longFormatLatencyBak$pm_value, digits = 2), sep="")
+longFormatLatencyBak <- longFormatLatencyBak[,-7]
+longFormatLatencyBak <- longFormatLatencyBak[,-8:-9]
+#longFormatLatencyBak <- longFormatLatencyBak[,-1:-2]
+longFormatLatencyBak <- longFormatLatencyBak[,c(1,2,7,3,4,8)]
+names(longFormatLatencyBak)[names(longFormatLatencyBak) == 'value'] <- 'MFLS'
+names(longFormatLatencyBak)[names(longFormatLatencyBak) == 'SDLATENCY'] <- 'SD'
+names(longFormatLatencyBak)[names(longFormatLatencyBak) == 'SEMLATENCY'] <- 'SEM'
+names(longFormatLatencyBak)[names(longFormatLatencyBak) == 'pm_value'] <- '95\\% CI'
+
+longFormatTpsBak <- datalistTps[[5]] #longFormatTps
+longFormatTpsBak$RL <- apply(longFormatTpsBak, 1, function(x) gsub("RL=", " ", x[["RL"]], fixed = TRUE))
+longFormatTpsBak$SDTPS <- round(longFormatTpsBak$SDTPS, digits = 2)
+longFormatTpsBak$value <- round(longFormatTpsBak$value, digits = 2)
+longFormatTpsBak$SEMTPS <- round(longFormatTpsBak$SEMTPS, digits = 2)
+longFormatTpsBak$pm_value <- longFormatTpsBak$CI_high_tps - longFormatTpsBak$value
+longFormatTpsBak$pm_value <- paste("$\\pm$",round(longFormatTpsBak$pm_value, digits = 2), sep="")
+longFormatTpsBak <- longFormatTpsBak[,-9:-10]
+longFormatTpsBak <- longFormatTpsBak[,-7]
+longFormatTpsBak <- longFormatTpsBak[,c(1,2,7,3,4,8)]
+names(longFormatTpsBak)[names(longFormatTpsBak) == 'value'] <- 'MTPS'
+names(longFormatTpsBak)[names(longFormatTpsBak) == 'SDTPS'] <- 'SD'
+names(longFormatLatencyBak)[names(longFormatLatencyBak) == 'SEMTPS'] <- 'SEM'
+names(longFormatTpsBak)[names(longFormatTpsBak) == 'pm_value'] <- '95\\% CI'
+
+longFormatAllDataRowsBak <- datalistFailures[[5]] #longFormatAllDataRows
+longFormatAllDataRowsBak$RL <- apply(longFormatAllDataRowsBak, 1, function(x) gsub("RL=", " ", x[["RL"]], fixed = TRUE))
+longFormatAllDataRowsBak <- longFormatAllDataRowsBak[,-3]
+longFormatAllDataRowsBak <- longFormatAllDataRowsBak[,-7:-8]
+longFormatAllDataRowsBak <- longFormatAllDataRowsBak[,-5]
+longFormatAllDataRowsBak$sdmrows <- round(longFormatAllDataRowsBak$sdmrows, digits = 2)
+longFormatAllDataRowsBak$value <- round(longFormatAllDataRowsBak$value, digits = 2)
+longFormatAllDataRowsBak$semmrows <- round(longFormatAllDataRowsBak$semmrows, digits = 2)
+longFormatAllDataRowsBak$pm_value <- longFormatAllDataRowsBak$CI_high_mrows - longFormatAllDataRowsBak$value
+longFormatAllDataRowsBak$pm_value <- paste("$\\pm$",round(longFormatAllDataRowsBak$pm_value, digits = 2), sep="")
+longFormatAllDataRowsBak <- longFormatAllDataRowsBak[,c(1,2,3,5,4,6,9)]
+names(longFormatAllDataRowsBak)[names(longFormatAllDataRowsBak) == 'value'] <- 'Received NoT'
+names(longFormatAllDataRowsBak)[names(longFormatAllDataRowsBak) == 'sdmrows'] <- 'SD'
+names(longFormatAllDataRowsBak)[names(longFormatAllDataRowsBak) == 'expected'] <- 'Expected NoT'
+names(longFormatAllDataRowsBak)[names(longFormatAllDataRowsBak) == 'semmrows'] <- 'SEM'
+names(longFormatAllDataRowsBak)[names(longFormatAllDataRowsBak) == 'pm_value'] <- '95\\% CI'
+
+longFormatLatencyBak$Category <- apply(longFormatLatencyBak, 1, function(x) gsub("BI=|BP=|BS=|MM=|PD=", " ", x[["Category"]], fixed = FALSE))
+longFormatTpsBak$Category <- apply(longFormatTpsBak, 1, function(x) gsub("BI=|BP=|BS=|MM=|PD=", " ", x[["Category"]], fixed = FALSE))
+longFormatAllDataRowsBak$Category <- apply(longFormatAllDataRowsBak, 1, function(x) gsub("BI=|BP=|BS=|MM=|PD=", " ", x[["Category"]], fixed = FALSE))
+colnames(longFormatLatencyBak)[2] <- "m"
+colnames(longFormatTpsBak)[2] <- "block_interval"
+colnames(longFormatAllDataRowsBak)[2] <- "block_interval"
+
+
+multi_xtable <- function(...)
+{
+  vars <- as.list(match.call(expand.dots = TRUE))[-1]
+  df_list <- lapply(vars, eval)
+  num_cols <- sapply(df_list, length)
+  if (!all(num_cols == num_cols[1]))
+    stop("All data frames must have equal number of columns")  
+  xtables <- lapply(df_list, function(x) capture.output(xtable::xtable(x)
+  ))
+  if (length(xtables) == 1) 
+    return(xtables[[1]])  
+  header <- xtables[[1]][1:6]
+  tail <- xtables[[1]][length(xtables[[1]]) + (-1:0)]
+  xtables <- lapply(xtables, function(x) x[7:(length(x) - 2)])
+  xtables <- do.call("c", xtables)  
+  cat(header, xtables, tail, sep = "\n")
+}
+
+makeTbl <- function(tbl, cpt, aln1, aln2) {
+  xt <-
+    xtable(
+      tbl,
+      digits = 2,
+      align = aln1,
+      caption = cpt,
+      sanitize.text.function = identity
+    )
+  
+  #digits(xt) <- 4
+  align(xt) <- xalign(xt)
+  #digits(xt) <- xdigits(xt)
+  display(xt) <- xdisplay(xt)
+  
+  print(
+    xtable(xt, align = aln2, caption = cpt),
+    #"Sawtooth"),
+    include.rownames = FALSE,
+    sanitize.text.function = identity
+  )
+  
+  return(xt)
+  
+}
+
+#longFormatTpsBakT <- makeTbl(longFormatTpsBak, "test", "ccccc", "ccc|cc")
+#longFormatLatencyBakT <- makeTbl(longFormatLatencyBak, "test", "ccccc", "ccc|cc")
+#multi_xtable(longFormatTpsBakT, longFormatLatencyBakT)
+makeTbl(longFormatAllDataRowsBak, "test",  "cccccccc", "cccc|cccc")
+
+makeTbl(cbind(longFormatTpsBak, longFormatLatencyBak[, 3:6]), "test2", "ccccccccccc", "ccccc|ccc|ccc")
+
+x1 <- tpsAndLatencyData[tpsAndLatencyData$run_id %like% "donothing" & tpsAndLatencyData$rl==400 & tpsAndLatencyData$cutCriteria==1000,]$stf
+x2 <- tpsAndLatencyData[tpsAndLatencyData$run_id %like% "donothing" & tpsAndLatencyData$rl==400 & tpsAndLatencyData$cutCriteria==1000,]$etf
+
+x3 <- tpsAndLatencyData[tpsAndLatencyData$run_id %like% "set" & tpsAndLatencyData$rl==400 & tpsAndLatencyData$cutCriteria==100,]$stf
+x4 <- tpsAndLatencyData[tpsAndLatencyData$run_id %like% "set" & tpsAndLatencyData$rl==400 & tpsAndLatencyData$cutCriteria==100,]$etf
+
+x5 <- tpsAndLatencyData[tpsAndLatencyData$run_id %like% "get" & tpsAndLatencyData$rl==400 & tpsAndLatencyData$cutCriteria==100,]$stf
+x6 <- tpsAndLatencyData[tpsAndLatencyData$run_id %like% "get" & tpsAndLatencyData$rl==400 & tpsAndLatencyData$cutCriteria==100,]$etf
+
+x7 <- tpsAndLatencyData[tpsAndLatencyData$run_id %like% "create" & tpsAndLatencyData$rl==400 & tpsAndLatencyData$cutCriteria==1000,]$stf
+x8 <- tpsAndLatencyData[tpsAndLatencyData$run_id %like% "create" & tpsAndLatencyData$rl==400 & tpsAndLatencyData$cutCriteria==1000,]$etf
+
+x9 <- tpsAndLatencyData[tpsAndLatencyData$run_id %like% "send" & tpsAndLatencyData$rl==400 & tpsAndLatencyData$cutCriteria==100,]$stf
+x10 <- tpsAndLatencyData[tpsAndLatencyData$run_id %like% "send" & tpsAndLatencyData$rl==400 & tpsAndLatencyData$cutCriteria==100,]$etf
+
+x11 <- tpsAndLatencyData[tpsAndLatencyData$run_id %like% "balance" & tpsAndLatencyData$rl==400 & tpsAndLatencyData$cutCriteria==1000,]$stf
+x12 <- tpsAndLatencyData[tpsAndLatencyData$run_id %like% "balance" & tpsAndLatencyData$rl==400 & tpsAndLatencyData$cutCriteria==1000,]$etf
+
+df <- data.frame()
+dfw <- do.call("rbind", list(df, matrix(x1), matrix(x2), matrix(x3), matrix(x4),
+                             matrix(x5), matrix(x6), matrix(x7), matrix(x8),
+                             matrix(x9), matrix(x10), matrix(x11), matrix(x12)))
+
+write.csv(dfw, "C:/Users/frank/Downloads/fabricFnh.csv", row.names=FALSE)

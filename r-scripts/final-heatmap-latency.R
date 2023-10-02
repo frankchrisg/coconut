@@ -20,7 +20,7 @@ library(RColorBrewer)
 library(remotes)
 #remotes::install_version("Rttf2pt1", version = "1.3.8")
 library(extrafont) 
-#font_import(paths = "C:/Users/parallels/Downloads/linux_libertine", prompt=FALSE)
+#font_import(paths = "C:/Users/frank/Downloads/linux_libertine", prompt=FALSE)
 #font_import(pattern = "LMRoman*")
 
 loadfonts()
@@ -30,7 +30,7 @@ loadfonts(); windowsFonts()
 ggplot2::update_geom_defaults("richtext", list(color = "black", family = "Linux Libertine", size=9*(1/72 * 25.4)))
 
 cleanTpl <-
-  function (base_size = 9,
+  function (base_size = 13,
             base_family = "Linux Libertine",
             ...) {
     modifyList (
@@ -41,27 +41,27 @@ cleanTpl <-
       panel.grid.minor = element_blank(),
       #legend.title = element_blank(),
       legend.position = "bottom",
-      axis.text.y = element_markdown(size = 9, color = "black", face = "bold", lineheight=1.5),
-      axis.title.y = element_text(size = 9, color = "black", margin = margin(t = 0, r = 10, b = 0, l = 0)),
+      axis.text.y = element_markdown(size = 13, color = "black", face = "bold", lineheight=1.5),
+      axis.title.y = element_text(size = 15, color = "black", margin = margin(t = 0, r = 10, b = 0, l = 0)),
       axis.text.x = element_markdown(
         color = "black",
-        size = 9,
+        size = 13,
         angle = 0,
         vjust = 0,
         face = "bold",
         lineheight=1.5
       ),
-      axis.title.x = element_text(size = 9, color = "black", margin = margin(t = 10, r = 0, b = 0, l = 0)),
+      axis.title.x = element_text(size = 15, color = "black", margin = margin(t = 10, r = 0, b = 0, l = 0)),
       axis.line.x = element_line(color = "grey", size = 0.5),
       plot.caption = element_markdown(
         hjust = 0.9,
         vjust = -0.5,
-        size = 9
+        size = 13
       ),
       legend.key.size = unit(0.7, "line"),
       legend.text = element_markdown(
         colour = "black",
-        size = 9#,
+        size = 13#,
         #face = "bold"
       ),
       legend.box.margin = margin(-15, -15, -10, -15),
@@ -72,7 +72,7 @@ save <- function(titleVar, plot) {
   fileName = tolower(gsub(
     " ",
     "",
-    paste("C:/Users/parallels/Downloads/", titleVar, ".png"),
+    paste("C:/Users/frank/Downloads/", titleVar, ".png"),
     fixed = TRUE
   ))
   ggsave(
@@ -95,45 +95,45 @@ save <- function(titleVar, plot) {
 }
 
 cordaos <-
-  read.table('C:/Users/parallels/Downloads/final-txts-latency/cordaos.txt',
+  read.table('C:/Users/frank/Downloads/final-txts-latency/cordaos.txt',
              sep = '&',
              comment.char = '\\')
 cordaos$bs <- "Corda OS"
 colnames(cordaos) <- c("V1", "V2", "V3", "V4", "V5")
 cordaenterprise <-
   read.table(
-    'C:/Users/parallels/Downloads/final-txts-latency/cordaenterprise.txt',
+    'C:/Users/frank/Downloads/final-txts-latency/cordaenterprise.txt',
     sep = '&',
     comment.char = '\\'
   )
 cordaenterprise$bs <- "Corda Enterprise"
 colnames(cordaenterprise) <- c("V1", "V2", "V3", "V4", "V5")
 graphene <-
-  read.table('C:/Users/parallels/Downloads/final-txts-latency/graphene.txt',
+  read.table('C:/Users/frank/Downloads/final-txts-latency/graphene.txt',
              sep = '&',
              comment.char = '\\')
 graphene$bs <- "BitShares"
 colnames(graphene) <- c("V1", "V2", "V3", "V4", "V5")
 fabric <-
-  read.table('C:/Users/parallels/Downloads/final-txts-latency/fabric.txt',
+  read.table('C:/Users/frank/Downloads/final-txts-latency/fabric.txt',
              sep = '&',
              comment.char = '\\')
 fabric$bs <- "Fabric"
 colnames(fabric) <- c("V1", "V2", "V3", "V4", "V5")
 quorum <-
-  read.table('C:/Users/parallels/Downloads/final-txts-latency/quorum.txt',
+  read.table('C:/Users/frank/Downloads/final-txts-latency/quorum.txt',
              sep = '&',
              comment.char = '\\')
 quorum$bs <- "Quorum"
 colnames(quorum) <- c("V1", "V2", "V3", "V4", "V5")
 sawtooth <-
-  read.table('C:/Users/parallels/Downloads/final-txts-latency/sawtooth.txt',
+  read.table('C:/Users/frank/Downloads/final-txts-latency/sawtooth.txt',
              sep = '&',
              comment.char = '\\')
 sawtooth$bs <- "Sawtooth"
 colnames(sawtooth) <- c("V1", "V2", "V3", "V4", "V5")
 diem <-
-  read.table('C:/Users/parallels/Downloads/final-txts-latency/diem.txt',
+  read.table('C:/Users/frank/Downloads/final-txts-latency/diem.txt',
              sep = '&',
              comment.char = '\\')
 diem$bs <- "Diem"
@@ -247,13 +247,14 @@ heatmap <-
             aes(fill = tps)) +
   geom_richtext(
     fill = NA,
+    fontface = "plain",
     label.color = NA,
     label.padding = grid::unit(rep(0, 4), "pt"),
-    lineheight=1.5,
+    lineheight=2.5,
     aes(
       fontface=2,
       label = paste(
-        "<span style='font-size:11pt;font-weight:bold; color:black'>",#<b>",
+        "<span style='font-size:15pt; color:black'>",#<b>", #;font-weight:bold
         "MTPS=",
         gsub(" ", "", format(round(tps, digits = 2), nsmall = 2)),
         #"</b></span>",
@@ -273,7 +274,7 @@ heatmap <-
   theme(legend.position = "none") +
   scale_x_discrete(labels = paste(basicSystems)) +
   scale_y_discrete(labels = yAxis, limits = rev(levels(preparedDataFrame$benchmarkName))) +
-  ylab(substitute(paste(bold("Benchmark")))) + xlab(substitute(paste(bold("Distributed Ledger System"))))
+  ylab(substitute(paste(bold("Benchmark")))) + xlab(substitute(paste(bold("Blockchain System"))))
 
 heatmap
 
@@ -309,7 +310,7 @@ savewithlegend <- function(titleVar, plot) {
   fileName = tolower(gsub(
     " ",
     "",
-    paste("C:/Users/parallels/Downloads/final-plots/heatmap/", titleVar, ".png"),
+    paste("C:/Users/frank/Downloads/final-plots/heatmap/", titleVar, ".png"),
     fixed = TRUE
   ))
   ggsave(
@@ -336,8 +337,8 @@ savewithlegend <- function(titleVar, plot) {
 
 heatmapwithlegend <- heatmap +   
   ##scale_fill_distiller(palette = "YlOrRd", limits=c(0, 1600), breaks=seq(0,1600,by=50)) +
-  scale_fill_gradientn(limits=c(0, 1600), breaks=seq(0,1600,by=50),
-                       colors = alpha(rev(brewer.pal(9, "YlOrRd")), alpha = .6)) +
+  scale_fill_gradientn(limits=c(0, 1600), breaks=seq(0,1600,by=100),
+                       colors = alpha(rev(brewer.pal(9, "YlOrRd")), alpha = .5)) +
   #scale_fill_gradient(low = "#F3F2C9", high = "#f8a288",
   #  limits=c(0, 1600), breaks=seq(0,1600,by=50)) + 
   theme(legend.position = "right",
@@ -347,12 +348,12 @@ heatmapwithlegend <- heatmap +
         #legend.title = element_blank(), #change legend title font size
         legend.text = element_markdown(
           colour = "black",
-          size = 11#,
+          size = 13#,
           #face = "bold"
         ),
         legend.title = element_markdown(
           colour = "black",
-          size = 11,
+          size = 13,
           face = "bold.italic"
         ),
         legend.box.margin = margin(0, 7, 0, -2),
@@ -363,3 +364,65 @@ savewithlegend(paste("heatmaplatencywithlegend", sep = ""),
                heatmapwithlegend)
 
 heatmapwithlegend
+
+
+ggsave(
+  "C:/Users/frank/Downloads/aaaaaaaaaaaaaaaaaa.svg",
+  plot = heatmapwithlegend,
+  device = "svg",
+  #path = NULL,
+  #scale = 1,
+  width = 38.00,#20.94, #20
+  #NA,
+  height = 18,
+  #NA,
+  units = c("cm"),
+  #"in"),
+  dpi = 320,
+  #320,
+  limitsize = TRUE,
+  bg = "white"
+)
+
+#############
+
+
+splitBmName <- str_split(preparedDataFrame$fullBenchmarkName, "-", n = Inf, simplify = FALSE)
+splitBmNameAsFrame <- as.data.frame(do.call(rbind, splitBmName))
+splitBmNameAsFrame <- str_replace_all(splitBmNameAsFrame$V1, fixed(" "), "")
+preparedDataFrameBak <- preparedDataFrame
+#preparedDataFrameBak$bmgroup <- splitBmNameAsFrame
+
+preparedDataFrameBakSel <- preparedDataFrameBak %>% select(basicSystem, tps, latency)#, bmgroup)
+
+preparedDataFrameBakSelSumEmuTps <- preparedDataFrameBakSel %>%
+  group_by(basicSystem) %>% #, bmgroup) %>%
+  summarise(
+    minTps = min(tps, na.rm = T),
+    maxTps = max(tps, na.rm = T)
+  )
+
+preparedDataFrameBakSelSumEmuLatency <- preparedDataFrameBakSel %>%
+  group_by(basicSystem) %>% #, bmgroup) %>%
+  summarise(
+    minLatency = min(latency, na.rm = T),
+    maxLatency = max(latency, na.rm = T)
+  )
+
+xa3 <- ggplot(data = preparedDataFrameBakSelSumEmuTps) + 
+  geom_segment(aes(x=paste(basicSystem), xend=paste(basicSystem),
+                   y=minTps, yend=maxTps), size = 7) +
+  scale_x_discrete(limits = rev(levels(paste(preparedDataFrameBakSelSumEmuTps$basicSystem)))) +
+  #theme(axis.ticks.y = element_blank(),
+  #      axis.text.y = element_blank()) +
+  coord_flip() +
+  xlab("") + ylab("")
+
+xa4 <- ggplot(data = preparedDataFrameBakSelSumEmuLatency) + 
+  geom_segment(aes(x=paste(basicSystem), xend=paste(basicSystem),
+                   y=minLatency, yend=maxLatency), size = 7) +
+  scale_x_discrete(limits = rev(levels(paste(preparedDataFrameBakSelSumEmuLatency$basicSystem)))) +
+  #theme(axis.ticks.y = element_blank(),
+  #      axis.text.y = element_blank()) +
+  coord_flip() +
+  xlab("") + ylab("")
