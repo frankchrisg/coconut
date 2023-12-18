@@ -1,0 +1,8 @@
+- import_playbook: registervars.yaml hostlist=postgres
+- hosts: "{{ hostset }}"
+  serial: "{{ SERIAL_EXECUTION }}"
+  roles:
+    - postgres
+  vars_files:
+    - "vars/common-vars.yaml"
+    - "vars/portainer-vars.yaml"

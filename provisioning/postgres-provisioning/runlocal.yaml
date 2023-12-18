@@ -1,0 +1,5 @@
+- import_playbook: init.yaml serial=1 hostset=realservers
+  when: INIT is defined and INIT | bool
+- import_playbook: common.yaml serial=1 hostset=realservers
+  when: COMMON is defined and COMMON | bool
+- import_playbook: postgres.yaml serial=1 hostset=postgres

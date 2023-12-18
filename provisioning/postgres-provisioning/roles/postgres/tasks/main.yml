@@ -1,0 +1,62 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Get container status
+  shell: docker inspect --format={{ '{{.State.Running}}' }} postgres
+  register: status
+  failed_when: status.rc != 1 and status.rc != 0
+- name: Pull postgres docker image
+  docker_image:
+    name: "postgres:{{ POSTGRES_VERSION }}"
+    tag: "postgres"
+  when: status.stdout != "true"
+- name: Create main config directory
+  file:
+    path: "{{ MAIN_CONFIG_PATH }}"
+    state: directory
+- name: Create postgresql directory to mount if it does not exist
+  file:
+    path: /var/lib/postgres-data
+    state: directory
+    mode: '0755'
+  become: true
+- name: Create docker-entrypoint-initdb.d directory
+  file: 
+    path: "{{ MAIN_CONFIG_PATH }}/docker-entrypoint-initdb.d"
+    state: directory
+- name: Copy docker-entrypoint-initdb.d
+  copy:
+    src: "{{ MAIN_CONFIG_PATH }}/docker-entrypoint-initdb.d"
+    dest: "{{ MAIN_CONFIG_PATH }}/"
+- name: Create postgres config
+  template:
+    src: "{{ MAIN_CONFIG_PATH }}/postgres-config.j2"
+    dest: "{{ MAIN_CONFIG_PATH }}/postgres-config.conf"
+- name: Start postgres on {{ inventory_hostname }}
+  shell: "docker run -d --name postgres --restart always --network='host' -v \"{{ MAIN_CONFIG_PATH }}/postgres-config.conf\":/etc/postgresql/postgresql.conf \
+   -v /var/lib/postgres-data:/var/lib/postgresql/data \
+   {{ MOUNT_PARAMETERS }} \
+   -e POSTGRES_USER={{ POSTGRES_USER }} \
+   -e POSTGRES_PASSWORD={{ POSTGRES_PASSWORD }} postgres:{{ POSTGRES_VERSION }} -c 'config_file=/etc/postgresql/postgresql.conf'"
+#  docker_container:
+#    name: postgres
+#    image: "postgres:{{ POSTGRES_VERSION }}"
+#    restart_policy: always
+#    env:
+#      POSTGRES_USER: "{{ POSTGRES_USER }}"
+#      POSTGRES_PASSWORD: "{{ POSTGRES_PASSWORD }}"
+#    volumes:
+#      - "{{ MAIN_CONFIG_PATH }}/docker-entrypoint-initdb.d/:/docker-entrypoint-initdb.d"
+#      - "{{ MAIN_CONFIG_PATH }}/postgres-config.conf:/etc/postgresql/postgresql.conf"
+#    network_mode: host
+  when: status.stdout != "true"
+- name: Wait for postgres container
+  wait_for:
+    port: "{{ POSTGRES_PORT }}"
+    host: "{{ inventory_hostname }}"
+- name: Add tzdata
+  shell: echo "apt update && apt install tzdata" | docker exec --interactive postgres /bin/sh
+- name: Copy timezone
+  shell: echo "cp /usr/share/zoneinfo/Europe/Berlin /etc/localtime" | docker exec --interactive postgres /bin/sh
+- name: Set timezone
+  shell: echo "echo 'Europe/Berlin' > /etc/timezone" | docker exec --interactive postgres /bin/sh

@@ -1,0 +1,41 @@
+CONFIG_PATH: "templates"
+MAIN_PATH: "{{ playbook_dir }}"
+MAIN_CONFIG_PATH: "{{MAIN_PATH}}/{{CONFIG_PATH}}"
+
+BASE_PATH: "/home/parallels/FINAL_graphene_corda_latest_xxx"
+
+PRUNE_DOCKER: true
+
+# How many tasks should be run in parallel during execution of Ansible
+RUN_LOCAL: true
+SERIAL_EXECUTION_NUMBER: 1
+SERIAL_EXECUTION: '{% if RUN_LOCAL -%}1{% else %}{{SERIAL_EXECUTION_NUMBER}}{% endif %}'
+# The default hostset for Ansible, can be overwritten or set Please pay attention for variable prioritization, see:
+# https://docs.ansible.com/ansible/latest/user_guide/playbooks_variables.html
+# hostset: "local"
+
+POSTGRES_USER: "postgres"
+POSTGRES_PASSWORD: "password123"
+POSTGRES_VERSION: "13.1"
+POSTGRES_PORT: 54321
+MAX_CONNECTIONS: 10000
+MOUNT_PARAMETERS: "-v {{ MAIN_CONFIG_PATH }}/docker-entrypoint-initdb.d/abpes_srv.sql:/docker-entrypoint-initdb.d/abpes_srv.sql"
+
+FURTHER_PARAMETERS: "shared_buffers = 4GB\n
+effective_cache_size = 12GB\n
+maintenance_work_mem = 1GB\n
+checkpoint_completion_target = 0.9\n
+wal_buffers = 16MB\n
+default_statistics_target = 100\n
+random_page_cost = 1.1\n
+effective_io_concurrency = 200\n
+work_mem = 104kB\n
+min_wal_size = 2GB\n
+max_wal_size = 8GB\n
+max_worker_processes = 8\n
+max_parallel_workers_per_gather = 4\n
+max_parallel_workers = 8\n
+max_parallel_maintenance_workers = 4\n"
+
+COMMON: false
+INIT: false

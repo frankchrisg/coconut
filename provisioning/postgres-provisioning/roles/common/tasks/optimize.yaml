@@ -1,0 +1,34 @@
+- name: Check if operating system is Ubuntu
+  fail: msg="Please use Ubuntu as operating system."
+  when: ansible_distribution != 'Ubuntu'
+- name: Set pam_limits
+  pam_limits:
+    domain: "*"
+    limit_type: "-"
+    limit_item: nofile
+    value: "{{ item.value }}"
+  loop:
+    - { value: "65535" }
+    - { value: "65535" }
+  become: true
+  tags: "optimize"
+- name: Set values in sysctl.conf
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_set: yes
+  loop:
+    - { name: "vm.swappiness", value: "10" }
+    - { name: "net.ipv4.tcp_window_scaling", value: "1" }
+    - { name: "net.ipv4.tcp_syncookies", value: "1" }
+    - { name: "net.ipv4.tcp_slow_start_after_idle", value: "0" }
+    - { name: "net.ipv4.tcp_max_syn_backlog", value: "65536" }
+    - { name: "net.core.wmem_default", value: "131072" }
+    - { name: "net.core.rmem_default", value: "131072" }
+    - { name: "net.core.rmem_max", value: "16777216" }
+    - { name: "net.core.wmem_max", value: "16777216" }
+    - { name: "net.ipv4.tcp_rmem", value: "4096 65536 16777216" }
+    - { name: "net.ipv4.tcp_wmem", value: "4096 65536 16777216" }
+  become: true
+  tags: "optimize"
